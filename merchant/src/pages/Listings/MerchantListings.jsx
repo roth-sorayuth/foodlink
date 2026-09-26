@@ -1,0 +1,420 @@
+import React, { useState } from 'react';
+import {
+  Plus,
+  Leaf,
+  TrendingUp,
+  Clock,
+  DollarSign,
+  Minus,
+  Edit2,
+  Trash2,
+  RotateCcw,
+  CheckCircle2,
+  Package,
+  User,
+  X
+} from 'lucide-react';
+
+export default function MerchantListings({
+  onOpenCreate,
+  onNavigateToProfile,
+  onEditListing
+}) {
+  const [activeFilter, setActiveFilter] = useState('active');
+  const [toastMessage, setToastMessage] = useState(null);
+
+  const showToast = (msg) => {
+    setToastMessage(msg);
+    setTimeout(() => {
+      setToastMessage(null);
+    }, 3500);
+  };
+
+  // Listings State
+  const [listings, setListings] = useState([
+    {
+      id: 'lst-1',
+      title: 'Artisan Pastry & Sourdough',
+      subtitle: 'Surprise mixed daily selection',
+      image: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=700&q=80',
+      price: '$4.99',
+      originalPrice: '$15.00',
+      status: 'active',
+      liveTag: 'Live • Selling Fast',
+      stockTag: 'Only 2 left',
+      soldCount: 8,
+      remainingCount: 2,
+      totalCount: 10,
+      earned: '$39.92',
+      pickupWindow: '6:30 – 7:30 PM',
+      isPaused: false
+    },
+    {
+      id: 'lst-2',
+      title: 'Croissant & Brioche Bundle',
+      subtitle: 'Sweet pastries & breakfast buns',
+      image: 'https://images.unsplash.com/photo-1555507036-ab1f4038808a?auto=format&fit=crop&w=700&q=80',
+      price: '$3.99',
+      originalPrice: '$12.00',
+      status: 'active',
+      liveTag: 'Live',
+      stockTag: null,
+      soldCount: 6,
+      remainingCount: 2,
+      totalCount: 8,
+      earned: '$23.94',
+      pickupWindow: '7:00 – 8:00 PM',
+      isPaused: false
+    },
+    {
+      id: 'lst-3',
+      title: 'Rustic French Baguette Duo',
+      subtitle: 'Twin crusty baguettes',
+      image: 'https://images.unsplash.com/photo-1549931319-a545dcf3bc73?auto=format&fit=crop&w=700&q=80',
+      price: '$3.49',
+      originalPrice: '$10.00',
+      status: 'sold-out',
+      liveTag: 'Sold Out (10/10)',
+      stockTag: null,
+      soldCount: 10,
+      remainingCount: 0,
+      totalCount: 10,
+      finishedTime: '5:45 PM',
+      earned: '$34.90',
+      isPaused: false
+    }
+  ]);
+
+  const updateRemaining = (id, delta) => {
+    setListings((prev) =>
+      prev.map((item) => {
+        if (item.id === id) {
+          const nextRemaining = Math.max(0, item.remainingCount + delta);
+          showToast(`Updated "${item.title}" stock to ${nextRemaining}`);
+          return {
+            ...item,
+            remainingCount: nextRemaining,
+            totalCount: item.soldCount + nextRemaining
+          };
+        }
+        return item;
+      })
+    );
+  };
+
+  const togglePause = (id) => {
+    setListings((prev) =>
+      prev.map((item) => {
+        if (item.id === id) {
+          const nextPaused = !item.isPaused;
+          showToast(nextPaused ? `Paused "${item.title}"` : `Resumed "${item.title}" on discovery feed`);
+          return { ...item, isPaused: nextPaused };
+        }
+        return item;
+      })
+    );
+  };
+
+  const relistItem = (item) => {
+    showToast(`Relisted "${item.title}" for tomorrow!`);
+  };
+
+  const filteredListings = listings.filter((item) => {
+    if (activeFilter === 'active') return item.status === 'active';
+    if (activeFilter === 'sold-out') return item.status === 'sold-out';
+    if (activeFilter === 'scheduled') return false;
+    return true;
+  });
+
+  return (
+    <div className="space-y-4">
+      
+      {/* Toast Alert */}
+      {toastMessage && (
+        <div className="fixed top-4 inset-x-4 max-w-sm mx-auto z-50 bg-[#1C1C1E] text-white text-xs font-semibold px-4 py-3 rounded-2xl shadow-xl border border-stone-700 flex items-center justify-between gap-3 animate-in fade-in slide-in-from-top-3">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+            <span>{toastMessage}</span>
+          </div>
+          <button onClick={() => setToastMessage(null)} className="text-stone-400 hover:text-white">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
+      {/* Top Section Header: Surplus Bags + Add Bag Button */}
+      <div className="flex items-center justify-between pt-1">
+        <div>
+          <h1 className="text-xl font-extrabold text-[#1C1C1E] tracking-tight">Surplus Bags</h1>
+          <p className="text-xs text-stone-500">Manage today's inventory & rescue revenue</p>
+        </div>
+
+        <button
+          onClick={onOpenCreate}
+          className="px-4 py-2 rounded-2xl bg-[#1b5e20] hover:bg-[#144919] text-white font-bold text-xs flex items-center gap-1.5 shadow-xs transition-transform active:scale-95 cursor-pointer"
+        >
+          <Plus className="w-4 h-4 stroke-[3]" />
+          <span>Add Bag</span>
+        </button>
+      </div>
+
+      {/* Hero Rescue Impact Banner */}
+      <div className="bg-[#EAF7ED] border border-emerald-200/80 rounded-2xl p-4 flex items-center justify-between shadow-2xs">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-full bg-[#1b5e20] text-white flex items-center justify-center shrink-0">
+            <Leaf className="w-5 h-5 fill-white/20" />
+          </div>
+          <div>
+            <span className="text-[10px] font-extrabold uppercase tracking-wider text-stone-500 block">
+              TODAY'S RESCUE IMPACT
+            </span>
+            <div className="font-extrabold text-sm text-[#1C1C1E] tracking-tight">
+              24 Bags Rescued • $98.76
+            </div>
+          </div>
+        </div>
+
+        <span className="inline-flex items-center gap-0.5 text-xs font-bold text-[#2E7D32]">
+          <TrendingUp className="w-3.5 h-3.5" />
+          <span>+18%</span>
+        </span>
+      </div>
+
+      {/* Filter Tabs */}
+      <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs font-semibold scrollbar-none">
+        <button
+          onClick={() => setActiveFilter('active')}
+          className={`px-3.5 py-1.5 rounded-full transition-colors whitespace-nowrap cursor-pointer ${
+            activeFilter === 'active'
+              ? 'bg-[#1b5e20] text-white shadow-xs'
+              : 'bg-stone-100 hover:bg-stone-200 text-stone-600'
+          }`}
+        >
+          Active 3
+        </button>
+
+        <button
+          onClick={() => setActiveFilter('scheduled')}
+          className={`px-3.5 py-1.5 rounded-full transition-colors whitespace-nowrap cursor-pointer ${
+            activeFilter === 'scheduled'
+              ? 'bg-[#1b5e20] text-white shadow-xs'
+              : 'bg-stone-100 hover:bg-stone-200 text-stone-600'
+          }`}
+        >
+          Scheduled 1
+        </button>
+
+        <button
+          onClick={() => setActiveFilter('sold-out')}
+          className={`px-3.5 py-1.5 rounded-full transition-colors whitespace-nowrap cursor-pointer ${
+            activeFilter === 'sold-out'
+              ? 'bg-[#1b5e20] text-white shadow-xs'
+              : 'bg-stone-100 hover:bg-stone-200 text-stone-600'
+          }`}
+        >
+          Sold Out 2
+        </button>
+
+        <button
+          onClick={() => setActiveFilter('past')}
+          className={`px-3.5 py-1.5 rounded-full transition-colors whitespace-nowrap cursor-pointer ${
+            activeFilter === 'past'
+              ? 'bg-[#1b5e20] text-white shadow-xs'
+              : 'bg-stone-100 hover:bg-stone-200 text-stone-600'
+          }`}
+        >
+          Past
+        </button>
+      </div>
+
+      {/* Listings List */}
+      <div className="space-y-4">
+        {filteredListings.map((item) => (
+          <div
+            key={item.id}
+            className="bg-white rounded-3xl border border-stone-200/80 overflow-hidden shadow-2xs hover:shadow-xs transition-shadow"
+          >
+            {/* Banner Image with Overlays */}
+            <div className="relative h-44 sm:h-52 w-full overflow-hidden bg-stone-100">
+              <img src={item.image} alt={item.title} className="w-full h-full object-cover" />
+
+              {/* Status badges */}
+              <div className="absolute top-3 left-3 flex items-center gap-1.5">
+                {item.status === 'active' ? (
+                  <span className="px-2.5 py-1 rounded-full bg-[#1b5e20] text-white text-xs font-bold shadow-xs flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                    <span>{item.liveTag}</span>
+                  </span>
+                ) : (
+                  <span className="px-2.5 py-1 rounded-full bg-stone-800/90 text-white text-xs font-bold shadow-xs flex items-center gap-1">
+                    <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                    <span>{item.liveTag}</span>
+                  </span>
+                )}
+              </div>
+
+              {item.stockTag && (
+                <div className="absolute top-3 right-3">
+                  <span className="px-2.5 py-1 rounded-full bg-orange-500 text-white text-xs font-bold shadow-xs flex items-center gap-1">
+                    🔥 {item.stockTag}
+                  </span>
+                </div>
+              )}
+
+              {/* Floating Bottom Details on Image */}
+              <div className="absolute bottom-3 inset-x-3 flex items-end justify-between text-white drop-shadow-md">
+                <div>
+                  <h3 className="font-extrabold text-base sm:text-lg leading-tight text-white">{item.title}</h3>
+                  <p className="text-xs text-white/90 font-medium">{item.subtitle}</p>
+                </div>
+                <div className="text-right">
+                  <span className="font-black text-xl text-white block leading-tight">{item.price}</span>
+                  {item.originalPrice && (
+                    <span className="text-xs text-white/80 line-through">{item.originalPrice}</span>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Inner Content */}
+            <div className="p-4 sm:p-5 space-y-3">
+              
+              {/* Active Item Details */}
+              {item.status === 'active' ? (
+                <>
+                  {/* Stock remaining meter */}
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between text-xs font-semibold">
+                      <div className="flex items-center gap-1 text-stone-700">
+                        <Package className="w-3.5 h-3.5 text-stone-500" />
+                        <span>Stock: {item.soldCount} Sold</span>
+                      </div>
+                      <span className={item.remainingCount <= 2 ? 'text-[#D96B1C] font-bold' : 'text-stone-600'}>
+                        {item.remainingCount} of {item.totalCount} remaining
+                      </span>
+                    </div>
+
+                    <div className="w-full h-2 bg-stone-100 rounded-full overflow-hidden">
+                      <div
+                        className={`h-full rounded-full ${
+                          item.remainingCount <= 2 ? 'bg-[#FF8A3D]' : 'bg-[#2E7D32]'
+                        }`}
+                        style={{ width: `${(item.soldCount / item.totalCount) * 100}%` }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Metrics Row: Earned & Pickup Window */}
+                  <div className="grid grid-cols-2 gap-3 pt-1">
+                    <div className="p-2.5 rounded-2xl bg-stone-50 border border-stone-200/70 flex items-center gap-2.5">
+                      <div className="w-7 h-7 rounded-xl bg-emerald-100 text-[#2E7D32] flex items-center justify-center">
+                        <DollarSign className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-stone-400 block font-medium">Earned</span>
+                        <span className="font-extrabold text-xs text-[#1C1C1E]">{item.earned}</span>
+                      </div>
+                    </div>
+
+                    <div className="p-2.5 rounded-2xl bg-stone-50 border border-stone-200/70 flex items-center gap-2.5">
+                      <div className="w-7 h-7 rounded-xl bg-orange-100 text-[#D96B1C] flex items-center justify-center">
+                        <Clock className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-stone-400 block font-medium">Pickup Today</span>
+                        <span className="font-bold text-xs text-[#1C1C1E]">{item.pickupWindow}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Actions & Stepper Row */}
+                  <div className="flex items-center justify-between pt-2 border-t border-stone-100">
+                    {/* Stepper */}
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => updateRemaining(item.id, -1)}
+                        className="w-8 h-8 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 flex items-center justify-center transition-colors active:scale-95"
+                      >
+                        <Minus className="w-3.5 h-3.5" />
+                      </button>
+                      <span className="font-extrabold text-sm text-[#1C1C1E] w-5 text-center">
+                        {item.remainingCount}
+                      </span>
+                      <button
+                        onClick={() => updateRemaining(item.id, 1)}
+                        className="w-8 h-8 rounded-xl bg-emerald-100 hover:bg-emerald-200 text-[#2E7D32] flex items-center justify-center transition-colors active:scale-95"
+                      >
+                        <Plus className="w-3.5 h-3.5 stroke-[3]" />
+                      </button>
+                    </div>
+
+                    {/* Pause, Edit, Delete */}
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={() => togglePause(item.id)}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-semibold border flex items-center gap-1.5 transition-colors ${
+                          item.isPaused
+                            ? 'bg-amber-100 text-amber-800 border-amber-300'
+                            : 'bg-stone-50 hover:bg-stone-100 text-stone-700 border-stone-200'
+                        }`}
+                      >
+                        <span className={`w-1.5 h-1.5 rounded-full ${item.isPaused ? 'bg-amber-600' : 'bg-[#2E7D32]'}`} />
+                        <span>{item.isPaused ? 'Paused' : 'Pause'}</span>
+                      </button>
+
+                      <button
+                        onClick={() => onEditListing && onEditListing(item)}
+                        className="w-8 h-8 rounded-xl bg-stone-50 hover:bg-stone-100 text-stone-600 border border-stone-200 flex items-center justify-center transition-colors"
+                      >
+                        <Edit2 className="w-3.5 h-3.5" />
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          setListings((prev) => prev.filter((l) => l.id !== item.id));
+                          showToast(`Removed "${item.title}"`);
+                        }}
+                        className="w-8 h-8 rounded-xl bg-stone-50 hover:bg-rose-50 text-stone-400 hover:text-rose-600 border border-stone-200 flex items-center justify-center transition-colors"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                /* Sold Out Item Details */
+                <div className="space-y-3">
+                  <div className="p-3 rounded-2xl bg-stone-50 border border-stone-200/80 flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-7 h-7 rounded-xl bg-emerald-100 text-[#2E7D32] flex items-center justify-center">
+                        <CheckCircle2 className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-stone-400 block font-medium">Finished at {item.finishedTime}</span>
+                        <span className="font-extrabold text-xs text-[#1C1C1E]">Total Earned: {item.earned}</span>
+                      </div>
+                    </div>
+
+                    <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-[#2E7D32] text-[10px] font-extrabold uppercase">
+                      100% Rescued
+                    </span>
+                  </div>
+
+                  <button
+                    onClick={() => relistItem(item)}
+                    className="w-full py-2.5 rounded-2xl bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-bold flex items-center justify-center gap-2 transition-colors cursor-pointer"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                    <span>Relist for Tomorrow</span>
+                  </button>
+                </div>
+              )}
+
+            </div>
+          </div>
+        ))}
+      </div>
+
+    </div>
+  );
+}
