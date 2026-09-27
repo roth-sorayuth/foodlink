@@ -11,14 +11,17 @@ import {
   ShoppingBag,
   RefreshCw,
   ExternalLink,
+  X,
 } from 'lucide-react';
-import { socket, getActiveListings } from '../../services/api';
+import { socket, getActiveListings, playNotificationSound } from '../../services/api';
 
 export default function CustomerExploreFeed({
   onSelectListing,
   onOpenMap,
   onNavigateToProfile,
   onNavigateToOrders,
+  onOpenNotifications,
+  unreadCount = 0,
 }) {
   const [activeCategory, setActiveCategory] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
@@ -26,6 +29,7 @@ export default function CustomerExploreFeed({
   const [listings, setListings] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [justAddedIds, setJustAddedIds] = useState(new Set());
+  const [liveBannerListing, setLiveBannerListing] = useState(null);
 
   const categories = [
     { id: 'All', label: 'All' },
@@ -160,6 +164,13 @@ export default function CustomerExploreFeed({
       const item = data?.listing || data;
       const normalized = normalizeListing(item);
 
+      // Play chime sound
+      playNotificationSound();
+
+      // Show live drop notification banner on dashboard
+      setLiveBannerListing(normalized);
+
+      // Instantly prepend to listings feed
       setListings((prev) => [normalized, ...prev.filter((l) => l.id !== normalized.id)]);
       setJustAddedIds((prev) => new Set(prev).add(normalized.id));
 
@@ -169,7 +180,7 @@ export default function CustomerExploreFeed({
           next.delete(normalized.id);
           return next;
         });
-      }, 10000);
+      }, 15000);
     };
 
     socket.on('NEW_LISTING', handleNewListing);
@@ -209,17 +220,71 @@ export default function CustomerExploreFeed({
           />
         </div>
 
-        {/* Notification Bell with Alert Dot */}
+        {/* Notification Bell with Real-Time Badge */}
         <button
           onClick={() => {
-            if (onNavigateToOrders) onNavigateToOrders();
+            if (onOpenNotifications) {
+              onOpenNotifications();
+            } else if (onNavigateToOrders) {
+              onNavigateToOrders();
+            }
           }}
-          className="relative w-11 h-11 rounded-full bg-white border border-stone-200/90 flex items-center justify-center text-[#2E7D32] hover:bg-[#EAF7ED]/50 transition-colors shadow-xs shrink-0 cursor-pointer"
+          className="relative w-11 h-11 rounded-full bg-white border border-stone-200/90 flex items-center justify-center text-[#2E7D32] hover:bg-[#EAF7ED]/50 transition-all shadow-xs shrink-0 cursor-pointer hover:scale-105 active:scale-95"
+          title="Open Notifications"
         >
           <Bell className="w-5 h-5" />
-          <span className="absolute top-2.5 right-2.5 w-2 h-2 rounded-full bg-[#2E7D32] ring-2 ring-white" />
+          {unreadCount > 0 ? (
+            <span className="absolute -top-1 -right-1 min-w-[20px] h-5 px-1.5 rounded-full bg-[#2E7D32] text-white text-[10px] font-black flex items-center justify-center ring-2 ring-white shadow-sm animate-bounce">
+              {unreadCount}
+            </span>
+          ) : (
+            <span className="absolute top-2.5 right-2.5 w-2 h-2 rounded-full bg-[#2E7D32] ring-2 ring-white" />
+          )}
         </button>
       </div>
+
+      {/* Live Surplus Drop Announcement Banner */}
+      {liveBannerListing && (
+        <div className="bg-gradient-to-r from-emerald-700 via-teal-700 to-emerald-800 text-white p-3.5 rounded-2xl shadow-lg flex items-center justify-between gap-3 animate-in fade-in slide-in-from-top-3 border border-emerald-500/40">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <span className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center shrink-0">
+              <Sparkles className="w-4 h-4 text-amber-300" />
+            </span>
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5">
+                <span className="text-[10px] font-black uppercase tracking-wider bg-emerald-500/50 px-2 py-0.5 rounded text-white border border-white/20">
+                  JUST LISTED NOW
+                </span>
+                <span className="text-xs font-bold truncate">
+                  {liveBannerListing.store}
+                </span>
+              </div>
+              <p className="text-xs font-medium text-emerald-100 truncate mt-0.5">
+                {liveBannerListing.title} • <strong className="text-white font-extrabold">{liveBannerListing.price}</strong> ({liveBannerListing.remaining} left)
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-1.5 shrink-0">
+            <button
+              onClick={() => {
+                onSelectListing(liveBannerListing);
+                setLiveBannerListing(null);
+              }}
+              className="px-3 py-1.5 rounded-xl bg-white text-[#2E7D32] font-black text-xs hover:bg-emerald-50 transition-colors shadow-xs cursor-pointer flex items-center gap-1"
+            >
+              <span>View</span>
+              <ChevronRight className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={() => setLiveBannerListing(null)}
+              className="p-1 text-white/70 hover:text-white cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* 2. CATEGORY FILTER PILLS */}
       <div className="flex items-center gap-2 overflow-x-auto pb-1 text-xs font-bold scrollbar-none">
@@ -274,6 +339,14 @@ export default function CustomerExploreFeed({
                     alt={item.store}
                     className="w-full h-full object-cover group-hover:scale-108 transition-transform duration-700 ease-out"
                   />
+
+                  {/* Just Added Glowing Badge */}
+                  {isJustAdded && (
+                    <div className="absolute top-2.5 left-2.5 z-10 flex items-center gap-1 px-2.5 py-1 rounded-xl bg-emerald-600 text-white text-[10px] font-black uppercase tracking-wider shadow-lg ring-2 ring-white animate-pulse">
+                      <Sparkles className="w-3 h-3 fill-amber-300 text-amber-300" />
+                      <span>JUST LISTED</span>
+                    </div>
+                  )}
 
                   {/* Dark Discount Price Badge (strikethrough + bold price) */}
                   <div className="absolute bottom-2.5 right-2.5 bg-black/80 backdrop-blur-md px-3 py-1 rounded-xl text-white flex items-center gap-1.5 shadow-md group-hover:scale-105 transition-transform duration-300">
@@ -356,12 +429,16 @@ export default function CustomerExploreFeed({
           </div>
         ) : (
           <div className="space-y-4">
-            {filteredListings.map((item, idx) => (
+            {filteredListings.map((item, idx) => {
+              const isJustAdded = justAddedIds.has(item.id);
+              return (
               <div
                 key={item.id}
                 onClick={() => onSelectListing(item)}
                 style={{ animationDelay: `${Math.min(idx, 6) * 60}ms` }}
-                className="bg-white rounded-3xl overflow-hidden border border-stone-200/80 food-card shadow-xs cursor-pointer flex flex-col group relative"
+                className={`bg-white rounded-3xl overflow-hidden border food-card shadow-xs cursor-pointer flex flex-col group relative transition-all duration-300 ${
+                  isJustAdded ? 'border-[#2E7D32] ring-2 ring-[#2E7D32]/40 shadow-md' : 'border-stone-200/80 hover:border-emerald-500/50'
+                }`}
               >
                 {/* Hero Image Banner */}
                 <div className="relative h-48 sm:h-56 w-full bg-stone-100 overflow-hidden">
@@ -370,6 +447,14 @@ export default function CustomerExploreFeed({
                     alt={item.store}
                     className="w-full h-full object-cover group-hover:scale-106 transition-transform duration-700 ease-out"
                   />
+
+                  {/* Just Added Glowing Badge */}
+                  {isJustAdded && (
+                    <div className="absolute top-3 left-3 z-10 flex items-center gap-1.5 px-3 py-1 rounded-xl bg-emerald-600 text-white text-xs font-black uppercase tracking-wider shadow-lg ring-2 ring-white animate-pulse">
+                      <Sparkles className="w-3.5 h-3.5 fill-amber-300 text-amber-300" />
+                      <span>JUST LISTED</span>
+                    </div>
+                  )}
 
                   {/* Dark Discount Price Badge */}
                   <div className="absolute bottom-3 right-3 bg-black/80 backdrop-blur-md px-3.5 py-1.5 rounded-xl text-white flex items-center gap-1.5 shadow-md group-hover:scale-105 transition-transform duration-300">
@@ -444,8 +529,9 @@ export default function CustomerExploreFeed({
                   </div>
                 </div>
               </div>
-            ))}
-          </div>
+            );
+          })}
+        </div>
         )}
       </div>
     </div>

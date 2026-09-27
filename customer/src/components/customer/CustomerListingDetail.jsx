@@ -19,12 +19,28 @@ import {
 } from 'lucide-react';
 
 export default function CustomerListingDetail({
+  listing,
   onBack,
   onProceedToCheckout,
   onNavigateToProfile
 }) {
   const [isFavorite, setIsFavorite] = useState(false);
   const [timeLeft, setTimeLeft] = useState({ hours: 2, minutes: 14, seconds: 43 });
+
+  // Dynamic listing properties with high-fidelity defaults
+  const title = listing?.title || 'Artisan Pastry & Sourdough Surprise Bag';
+  const storeName = listing?.store || listing?.storeName || listing?.store?.name || 'CAD Bakery';
+  const category = listing?.category || 'Bakery & Pastries';
+  const image = listing?.image || listing?.photoUrl || 'https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=1000&q=80';
+  const price = typeof listing?.price === 'number' ? `$${listing.price.toFixed(2)}` : listing?.price || '$4.99';
+  const originalPrice = typeof listing?.originalPrice === 'number' ? `$${listing.originalPrice.toFixed(2)}` : listing?.originalPrice || '$16.00';
+  const discount = listing?.discount || 'Save 69%';
+  const bags = listing?.remaining !== undefined ? listing.remaining : (listing?.bagsAvailable || 3);
+  const address = listing?.address || listing?.store?.address || '422 St 178, Daun Penh';
+  const distance = listing?.distance || listing?.store?.distance || '0.4 mi (8 min walk)';
+  const rating = listing?.rating || listing?.store?.rating || '4.9';
+  const pickupTime = listing?.pickupTime || `${listing?.pickupStart || '6:30 PM'} – ${listing?.pickupEnd || '7:30 PM'}`;
+  const description = listing?.description || "Help us prevent delicious food from going to waste! You will receive an assortment of today's unsold fresh artisan bakery surplus. Contents vary daily based on surplus.";
 
   // Countdown timer simulation
   useEffect(() => {
@@ -82,8 +98,8 @@ export default function CustomerListingDetail({
           {/* Hero Image Banner */}
           <div className="relative h-64 sm:h-80 w-full rounded-3xl overflow-hidden bg-stone-100 shadow-xs group">
             <img
-              src="https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=1000&q=80"
-              alt="Golden Gate Bakery"
+              src={image}
+              alt={storeName}
               className="w-full h-full object-cover group-hover:scale-102 transition-transform duration-700"
             />
             <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/30" />
@@ -93,7 +109,7 @@ export default function CustomerListingDetail({
               <div className="flex items-center gap-2">
                 <span className="px-3 py-1 rounded-full bg-white/95 text-stone-800 text-xs font-bold shadow-xs flex items-center gap-1.5 backdrop-blur-xs">
                   <span>🥐</span>
-                  <span>Bakery & Pastries</span>
+                  <span>{category}</span>
                 </span>
                 <span className="px-3 py-1 rounded-full bg-[#1b5e20]/90 text-white text-xs font-bold shadow-xs flex items-center gap-1 backdrop-blur-xs">
                   <Leaf className="w-3.5 h-3.5" />
@@ -126,14 +142,14 @@ export default function CustomerListingDetail({
             <div className="flex items-start justify-between gap-3">
               <div>
                 <h2 className="text-xl sm:text-2xl font-black text-[#1C1C1E] tracking-tight">
-                  Golden Gate Bakery & Cafe
+                  {storeName}
                 </h2>
-                <p className="text-xs text-stone-500 font-medium">Artisanal European Bakery · San Francisco</p>
+                <p className="text-xs text-stone-500 font-medium">Artisanal Bakery & Sustainable Cafe</p>
               </div>
 
               <span className="px-2.5 py-1 rounded-full bg-emerald-100 text-[#2E7D32] text-xs font-black flex items-center gap-1 shrink-0">
                 <Star className="w-3.5 h-3.5 fill-[#2E7D32] text-[#2E7D32]" />
-                <span>4.9</span>
+                <span>{rating}</span>
               </span>
             </div>
 
@@ -144,12 +160,12 @@ export default function CustomerListingDetail({
               <span>•</span>
               <span className="flex items-center gap-1 text-stone-500 font-normal">
                 <MapPin className="w-3.5 h-3.5 text-[#2E7D32]" />
-                <span>0.4 mi (8 min walk)</span>
+                <span>{distance}</span>
               </span>
             </div>
 
             <div className="p-3 rounded-2xl bg-stone-50 border border-stone-200/70 flex items-center justify-between text-xs">
-              <span className="text-stone-700 font-medium">542 Valencia St, Mission District</span>
+              <span className="text-stone-700 font-medium">{address}</span>
               <button className="font-bold text-[#2E7D32] hover:underline flex items-center gap-1">
                 <span>View Map</span>
                 <span>→</span>
@@ -164,8 +180,8 @@ export default function CustomerListingDetail({
                 <Flame className="w-5 h-5 fill-white" />
               </div>
               <div>
-                <h4 className="font-extrabold text-xs sm:text-sm text-[#8C3A00]">Hurry! Only 2 bags left today</h4>
-                <p className="text-[11px] text-[#8C3A00]/80">High rescue demand in the Mission District</p>
+                <h4 className="font-extrabold text-xs sm:text-sm text-[#8C3A00]">Hurry! Only {bags} bags left today</h4>
+                <p className="text-[11px] text-[#8C3A00]/80">High rescue demand nearby</p>
               </div>
             </div>
 
@@ -185,14 +201,14 @@ export default function CustomerListingDetail({
                 <span>SURPLUS MYSTERY OFFER</span>
               </span>
               <span className="px-2.5 py-1 rounded-full bg-orange-100 text-[#D96B1C] text-xs font-bold">
-                Save 69%
+                {discount}
               </span>
             </div>
 
             <div>
-              <h3 className="font-extrabold text-lg text-[#1C1C1E]">Artisan Pastry & Sourdough Surprise Bag</h3>
+              <h3 className="font-extrabold text-lg text-[#1C1C1E]">{title}</h3>
               <p className="text-xs text-stone-600 mt-2 leading-relaxed">
-                Help us prevent delicious food from going to waste! You will receive an assortment of today's unsold fresh artisan sourdough loaves, flaky butter croissants, fruit danishes, or savory rosemary focaccia. Contents vary daily based on surplus.
+                {description}
               </p>
             </div>
 
@@ -309,17 +325,17 @@ export default function CustomerListingDetail({
               <span className="text-[10px] font-extrabold uppercase tracking-wider text-[#2E7D32] block">
                 SCHEDULED WINDOW
               </span>
-              <div className="font-black text-base text-[#1C1C1E]">Today, 6:30 PM – 7:30 PM</div>
+              <div className="font-black text-base text-[#1C1C1E]">{pickupWindow}</div>
               <p className="text-xs text-stone-500 flex items-center gap-1 pt-0.5">
                 <Clock className="w-3.5 h-3.5 text-stone-400" />
-                <span>Window closes promptly at 7:30 PM</span>
+                <span>Window closes promptly at end of time</span>
               </p>
             </div>
 
             <div className="p-3 rounded-2xl bg-stone-50 border border-stone-200/70 flex items-start gap-2 text-xs text-stone-600 leading-relaxed">
               <span className="text-base leading-none">ℹ️</span>
               <p>
-                Show your digital pickup pass at the main bakery counter. <strong className="text-stone-800">Bring your own reusable tote bag</strong> to save an additional paper bag!
+                Show your digital pickup pass at the main counter. <strong className="text-stone-800">Bring your own reusable tote bag</strong> to save an additional paper bag!
               </p>
             </div>
           </div>
@@ -328,7 +344,7 @@ export default function CustomerListingDetail({
           <div className="bg-white rounded-3xl border border-stone-200/80 p-5 shadow-2xs space-y-3">
             <div className="flex items-center justify-between">
               <span className="font-extrabold text-sm text-[#1C1C1E]">Store Location</span>
-              <span className="text-xs font-semibold text-stone-500">Mission District</span>
+              <span className="text-xs font-semibold text-stone-500">{storeName}</span>
             </div>
 
             {/* Map Canvas Preview */}
@@ -347,7 +363,7 @@ export default function CustomerListingDetail({
 
               {/* Bottom Address Button */}
               <div className="absolute bottom-2.5 inset-x-2.5 flex items-center justify-between p-2 rounded-xl bg-white/95 backdrop-blur-md shadow-xs text-xs">
-                <span className="font-bold text-stone-800 truncate">542 Valencia St, SF</span>
+                <span className="font-bold text-stone-800 truncate">{address}</span>
                 <span className="font-extrabold text-[#2E7D32] text-[11px] shrink-0 ml-1">Open Navigation</span>
               </div>
             </div>
@@ -368,11 +384,11 @@ export default function CustomerListingDetail({
           <div className="hidden lg:block bg-white rounded-3xl border border-stone-200/80 p-5 shadow-2xs space-y-3">
             <div className="flex items-baseline justify-between">
               <div>
-                <span className="text-2xl font-black text-[#1C1C1E]">$4.99</span>
-                <span className="text-xs text-stone-400 line-through ml-2">$16.00 value</span>
+                <span className="text-2xl font-black text-[#1C1C1E]">{price}</span>
+                <span className="text-xs text-stone-400 line-through ml-2">{originalPrice} value</span>
               </div>
               <span className="px-2.5 py-0.5 rounded-full bg-orange-100 text-[#D96B1C] text-xs font-bold">
-                Save 69%
+                {discount}
               </span>
             </div>
 
@@ -398,14 +414,14 @@ export default function CustomerListingDetail({
           
           <div className="flex items-center justify-between text-xs px-1">
             <div className="flex items-baseline gap-1.5">
-              <span className="text-lg font-black text-[#1C1C1E]">$4.99</span>
-              <span className="text-xs text-stone-400 line-through">$16.00 value</span>
+              <span className="text-lg font-black text-[#1C1C1E]">{price}</span>
+              <span className="text-xs text-stone-400 line-through">{originalPrice} value</span>
               <span className="px-1.5 py-0.5 rounded bg-orange-100 text-[#D96B1C] text-[10px] font-bold">
-                Save 69%
+                {discount}
               </span>
             </div>
 
-            <span className="text-[11px] font-bold text-orange-600">🔥 Only 2 left</span>
+            <span className="text-[11px] font-bold text-orange-600">🔥 Only {bags} left</span>
           </div>
 
           <button

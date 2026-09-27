@@ -8,9 +8,25 @@ export async function getNotifications(req, res) {
   try {
     const notifications = await prisma.notification.findMany({
       orderBy: { createdAt: 'desc' },
-      take: 30,
+      take: 40,
     });
-    return res.json(notifications);
+
+    const listingIds = notifications.map((n) => n.listingId).filter(Boolean);
+    let listingsMap = {};
+    if (listingIds.length > 0) {
+      const listings = await prisma.listing.findMany({
+        where: { id: { in: listingIds } },
+        include: { store: true },
+      });
+      listingsMap = Object.fromEntries(listings.map((l) => [l.id, l]));
+    }
+
+    const enriched = notifications.map((n) => ({
+      ...n,
+      listing: n.listingId ? listingsMap[n.listingId] || null : null,
+    }));
+
+    return res.json(enriched);
   } catch (error) {
     console.error('Error fetching notifications:', error);
     return res.status(500).json({ error: 'Failed to fetch notifications', details: error.message });

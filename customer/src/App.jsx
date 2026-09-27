@@ -17,7 +17,15 @@ import CustomerCheckoutFlow from './components/customer/CustomerCheckoutFlow';
 import CustomerActivePickup from './components/customer/CustomerActivePickup';
 import CustomerProfile from './components/customer/CustomerProfile';
 import ListingAlertPopup from './components/customer/ListingAlertPopup';
-import { socket, reserveListing } from './services/api';
+import CustomerNotificationsModal from './components/customer/CustomerNotificationsModal';
+import {
+  socket,
+  reserveListing,
+  getNotifications,
+  markNotificationAsRead,
+  markAllNotificationsAsRead,
+  playNotificationSound,
+} from './services/api';
 
 export default function App() {
   // Screen State: 'discover' | 'explore' | 'listing-detail' | 'checkout' | 'reserved' | 'profile'
@@ -26,8 +34,10 @@ export default function App() {
   const [selectedListing, setSelectedListing] = useState(null);
   const [toastMessage, setToastMessage] = useState(null);
 
-  // Real-time Popup Alert State
+  // Real-time Popup Alert & Notifications State
   const [activeAlert, setActiveAlert] = useState(null);
+  const [notifications, setNotifications] = useState([]);
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
 
   const showToast = (msg) => {
@@ -35,20 +45,72 @@ export default function App() {
     setTimeout(() => setToastMessage(null), 3500);
   };
 
-  // Socket.io Real-Time Listener at App Root
+  // 1. Fetch recent notifications from server on mount
+  useEffect(() => {
+    async function loadInitialNotifications() {
+      try {
+        const notifs = await getNotifications();
+        if (Array.isArray(notifs)) {
+          setNotifications(notifs);
+          const unread = notifs.filter((n) => !n.isRead).length;
+          setUnreadCount(unread);
+        }
+      } catch (err) {
+        console.error('Failed to load notifications:', err);
+      }
+    }
+    loadInitialNotifications();
+  }, []);
+
+  // 2. Socket.io Real-Time Listener at App Root
   useEffect(() => {
     const handleNewListing = (data) => {
       console.log('⚡ [Customer App] Received live NEW_LISTING event:', data);
       setActiveAlert(data);
+      playNotificationSound();
+
+      const newNotif = data?.notification || {
+        id: `notif-${Date.now()}`,
+        type: 'NEW_LISTING',
+        title: 'New Surplus Food Available!',
+        message: `${data?.listing?.storeName || 'Merchant'} just listed "${data?.listing?.title}"`,
+        listing: data?.listing,
+        isRead: false,
+        createdAt: new Date().toISOString(),
+      };
+
+      setNotifications((prev) => [newNotif, ...prev.filter((n) => n.id !== newNotif.id)]);
+      setUnreadCount((prev) => prev + 1);
+    };
+
+    const handleNotificationReceived = (notif) => {
+      console.log('⚡ [Customer App] Received live notification:', notif);
+      setNotifications((prev) => [notif, ...prev.filter((n) => n.id !== notif.id)]);
       setUnreadCount((prev) => prev + 1);
     };
 
     socket.on('NEW_LISTING', handleNewListing);
+    socket.on('NOTIFICATION_RECEIVED', handleNotificationReceived);
 
     return () => {
       socket.off('NEW_LISTING', handleNewListing);
+      socket.off('NOTIFICATION_RECEIVED', handleNotificationReceived);
     };
   }, []);
+
+  const handleMarkAsRead = async (id) => {
+    setNotifications((prev) =>
+      prev.map((n) => (n.id === id ? { ...n, isRead: true } : n))
+    );
+    setUnreadCount((prev) => Math.max(0, prev - 1));
+    await markNotificationAsRead(id);
+  };
+
+  const handleMarkAllAsRead = async () => {
+    setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
+    setUnreadCount(0);
+    await markAllNotificationsAsRead();
+  };
 
   const handleSelectListing = (item) => {
     setSelectedListing(item);
@@ -75,6 +137,20 @@ export default function App() {
   return (
     <div className="min-h-screen bg-[#F5F5F7] text-[#1C1C1E] flex flex-col font-sans antialiased selection:bg-[#2E7D32] selection:text-white relative">
       
+      {/* Real-time Customer Notifications Modal */}
+      <CustomerNotificationsModal
+        isOpen={isNotificationsOpen}
+        onClose={() => setIsNotificationsOpen(false)}
+        notifications={notifications}
+        unreadCount={unreadCount}
+        onMarkAsRead={handleMarkAsRead}
+        onMarkAllAsRead={handleMarkAllAsRead}
+        onSelectListing={(item) => {
+          handleSelectListing(item);
+          setIsNotificationsOpen(false);
+        }}
+      />
+
       {/* Real-time Popup Alert when Merchant Uploads Food */}
       {activeAlert && (
         <ListingAlertPopup
@@ -119,6 +195,8 @@ export default function App() {
               setCurrentScreen('reserved');
               setActiveBottomTab('reserved');
             }}
+            onOpenNotifications={() => setIsNotificationsOpen(true)}
+            unreadCount={unreadCount}
           />
         )}
 

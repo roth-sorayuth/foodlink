@@ -15,12 +15,31 @@ import {
 } from 'lucide-react';
 
 export default function CustomerCheckoutFlow({
+  listing,
   onBack,
   onConfirmPayment,
   onNavigateToProfile
 }) {
   const [bringTote, setBringTote] = useState(true);
   const [timerSeconds, setTimerSeconds] = useState(580); // 09:40
+
+  const title = listing?.title || 'Artisan Pastry & Sourdough Surprise Bag';
+  const storeName = listing?.store || listing?.storeName || listing?.store?.name || 'CAD Bakery';
+  const image = listing?.image || listing?.photoUrl || 'https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=300&q=80';
+  const address = listing?.address || listing?.store?.address || '422 St 178, Daun Penh';
+  const pickupWindow = listing?.pickupTime || `${listing?.pickupStart || '6:30 PM'} – ${listing?.pickupEnd || '7:30 PM'}`;
+  
+  const priceNum = typeof listing?.price === 'number' 
+    ? listing.price 
+    : parseFloat(String(listing?.price || '4.99').replace(/[^0-9.]/g, '')) || 4.99;
+  const origPriceNum = typeof listing?.originalPrice === 'number'
+    ? listing.originalPrice
+    : parseFloat(String(listing?.originalPrice || '16.00').replace(/[^0-9.]/g, '')) || 16.00;
+  const savingsNum = Math.max(0, origPriceNum - priceNum);
+  const discount = listing?.discount || (origPriceNum > 0 ? `${Math.round((savingsNum / origPriceNum) * 100)}% off` : '69% off');
+  const fee = 0.49;
+  const tax = Number((priceNum * 0.085).toFixed(2));
+  const total = (priceNum + fee + tax).toFixed(2);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -100,8 +119,8 @@ export default function CustomerCheckoutFlow({
             <div className="flex items-start gap-3.5">
               <div className="relative w-16 h-16 rounded-2xl overflow-hidden shrink-0 shadow-2xs border border-stone-200">
                 <img
-                  src="https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=300&q=80"
-                  alt="Item"
+                  src={image}
+                  alt={title}
                   className="w-full h-full object-cover"
                 />
                 <span className="absolute top-1 left-1 px-1.5 py-0.5 rounded bg-[#1b5e20] text-white text-[8px] font-black uppercase">
@@ -111,13 +130,13 @@ export default function CustomerCheckoutFlow({
 
               <div className="space-y-0.5">
                 <span className="text-[10px] font-extrabold uppercase tracking-wider text-amber-700 flex items-center gap-1">
-                  <Check className="w-3 h-3 stroke-[3]" /> ARTISAN BAKERY
+                  <Check className="w-3 h-3 stroke-[3]" /> SURPLUS RESCUE
                 </span>
-                <h3 className="font-extrabold text-base text-[#1C1C1E]">Golden Gate Bakery & C...</h3>
-                <p className="text-xs font-semibold text-stone-700">1× Pastry & Sourdough Surprise Bag</p>
+                <h3 className="font-extrabold text-base text-[#1C1C1E]">{storeName}</h3>
+                <p className="text-xs font-semibold text-stone-700">1× {title}</p>
                 <p className="text-[11px] text-stone-500 flex items-center gap-1">
                   <MapPin className="w-3 h-3 text-[#2E7D32]" />
-                  <span>542 Valencia St, Mission District</span>
+                  <span>{address}</span>
                 </p>
               </div>
             </div>
@@ -128,12 +147,12 @@ export default function CustomerCheckoutFlow({
                 <Clock className="w-4 h-4 text-amber-600" />
                 <div>
                   <span className="text-[10px] text-stone-400 font-bold uppercase block">Pickup Time</span>
-                  <span className="font-extrabold text-stone-900">Today, 6:30 PM – 7:30 PM</span>
+                  <span className="font-extrabold text-stone-900">{pickupWindow}</span>
                 </div>
               </div>
 
               <span className="px-2.5 py-0.5 rounded-full bg-orange-100 text-[#D96B1C] text-[11px] font-bold">
-                In 2 hrs
+                Today
               </span>
             </div>
 
@@ -147,17 +166,17 @@ export default function CustomerCheckoutFlow({
             <div className="space-y-2 pt-2 border-t border-stone-100 text-xs">
               <div className="flex justify-between text-stone-500">
                 <span>Standard Store Value</span>
-                <span className="line-through">$16.00</span>
+                <span className="line-through">${origPriceNum.toFixed(2)}</span>
               </div>
 
               <div className="flex justify-between text-[#2E7D32] font-bold">
-                <span>Surplus Rescue Savings (69% off)</span>
-                <span>-$11.01</span>
+                <span>Surplus Rescue Savings ({discount})</span>
+                <span>-${savingsNum.toFixed(2)}</span>
               </div>
 
               <div className="flex justify-between font-bold text-stone-900">
                 <span>Bag Price</span>
-                <span>$4.99</span>
+                <span>${priceNum.toFixed(2)}</span>
               </div>
 
               <div className="flex justify-between text-stone-500">
@@ -165,12 +184,12 @@ export default function CustomerCheckoutFlow({
                   <span>Platform & Climate Fee</span>
                   <Info className="w-3 h-3 text-stone-400" />
                 </span>
-                <span>$0.49</span>
+                <span>${fee.toFixed(2)}</span>
               </div>
 
               <div className="flex justify-between text-stone-500">
                 <span>Estimated Sales Tax</span>
-                <span>$0.42</span>
+                <span>${tax.toFixed(2)}</span>
               </div>
 
               <div className="flex items-baseline justify-between pt-3 border-t border-stone-200">
@@ -178,7 +197,7 @@ export default function CustomerCheckoutFlow({
                   <span className="font-extrabold text-base text-[#1C1C1E] block">Total Due Now</span>
                   <span className="text-[10px] text-amber-700 font-semibold">Guaranteed fresh or credited</span>
                 </div>
-                <span className="text-2xl font-black text-[#1b5e20]">$5.90</span>
+                <span className="text-2xl font-black text-[#1b5e20]">${total}</span>
               </div>
             </div>
 
@@ -279,7 +298,7 @@ export default function CustomerCheckoutFlow({
               className="w-full py-4 rounded-2xl bg-[#1b5e20] hover:bg-[#144919] text-white font-extrabold text-sm flex items-center justify-center gap-2 shadow-sm transition-transform active:scale-[0.99] cursor-pointer"
             >
               <Lock className="w-4 h-4" />
-              <span>Confirm & Pay $5.90</span>
+              <span>Confirm & Pay ${total}</span>
             </button>
             <p className="text-[11px] text-stone-400 text-center">
               🔒 256-bit Encrypted Checkout • Instant Confirmation
@@ -298,7 +317,7 @@ export default function CustomerCheckoutFlow({
             className="w-full py-3.5 rounded-2xl bg-[#1b5e20] hover:bg-[#144919] text-white font-extrabold text-sm flex items-center justify-center gap-2 shadow-sm transition-transform active:scale-[0.99] cursor-pointer"
           >
             <Lock className="w-4 h-4" />
-            <span>Confirm & Pay $5.90</span>
+            <span>Confirm & Pay ${total}</span>
           </button>
           <p className="text-[10px] text-stone-400 text-center">
             🔒 256-bit Encrypted Checkout • Instant Confirmation
