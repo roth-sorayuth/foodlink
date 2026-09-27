@@ -21,7 +21,9 @@ export default function CustomerActivePickup({
   const orderId = order?.orderId || 'FS-84920';
   const storeName = order?.listing?.store || order?.storeName || 'Golden Gate Bakery & Cafe';
   const quantity = order?.quantity || 1;
-  const digits = order?.digits || ['7', '8', '9'];
+  const digits = (order?.digits && order.digits.length === 6)
+    ? order.digits
+    : ['7', '8', '9', '4', '2', '0'];
 
   return (
     <div className="space-y-4 pb-20">
@@ -81,24 +83,21 @@ export default function CustomerActivePickup({
         {/* Left Column: Digital Pickup Pass */}
         <div className="lg:col-span-6 space-y-4">
           
-          {/* Digital Pickup Pass Pass Card */}
-          <div className="bg-white rounded-3xl border border-stone-200/80 p-5 sm:p-6 shadow-2xs space-y-5 relative overflow-hidden">
-            <div className="space-y-2 text-center">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-stone-400">
+          {/* Digital Pickup Pass Card (Single 6-digit display, no duplication) */}
+          <div className="bg-white rounded-3xl border border-stone-200/80 p-5 sm:p-6 shadow-2xs space-y-4 relative overflow-hidden">
+            <div className="text-center">
+              <span className="text-[11px] font-extrabold uppercase tracking-widest text-stone-400">
                 OFFICIAL DIGITAL PICKUP PASS
               </span>
-              <div className="font-mono text-2xl font-black text-[#1C1C1E] tracking-widest">
-                SAVER - {digits.join(' ')}
-              </div>
             </div>
 
-            {/* Digits Only Code Display (NO BARCODE) */}
-            <div className="p-5 bg-stone-50 rounded-2xl border border-stone-200/70 flex flex-col items-center justify-center space-y-3">
-              <div className="flex items-center justify-center gap-3">
+            {/* 6-Digit Code Display (NO BARCODE, ONLY ONCE) */}
+            <div className="p-4 sm:p-5 bg-stone-50 rounded-2xl border border-stone-200/70 flex flex-col items-center justify-center space-y-3">
+              <div className="flex items-center justify-center gap-1.5 sm:gap-2.5">
                 {digits.map((d, i) => (
                   <div
                     key={i}
-                    className="w-14 h-16 rounded-2xl bg-white border-2 border-[#1b5e20] flex items-center justify-center font-mono text-3xl font-black text-[#1C1C1E] shadow-xs"
+                    className="w-10 h-14 sm:w-12 sm:h-16 rounded-xl sm:rounded-2xl bg-white border-2 border-[#1b5e20] flex items-center justify-center font-mono text-2xl sm:text-3xl font-black text-[#1C1C1E] shadow-xs"
                   >
                     {d}
                   </div>

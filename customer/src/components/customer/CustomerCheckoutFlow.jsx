@@ -21,7 +21,6 @@ import {
 export default function CustomerCheckoutFlow({
   listing,
   quantity: initialQuantity = 1,
-  listing,
   onBack,
   onConfirmPayment,
   onNavigateToProfile

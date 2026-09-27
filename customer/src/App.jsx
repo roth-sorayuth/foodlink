@@ -129,7 +129,7 @@ export default function App() {
     const finalQty = details.quantity || reserveQuantity || 1;
     const orderData = {
       orderId: 'FS-84920',
-      digits: ['7', '8', '9'],
+      digits: ['7', '8', '9', '4', '2', '0'],
       quantity: finalQty,
       listing: selectedListing,
       totalPaid: details.totalDue || ((4.99 * finalQty) + 0.91).toFixed(2),
