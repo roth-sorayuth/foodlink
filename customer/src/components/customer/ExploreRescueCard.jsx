@@ -77,7 +77,7 @@ export default function ExploreRescueCard({
 
           {/* Store & Package Title */}
           <h4 className="font-extrabold text-sm sm:text-base text-slate-900 leading-tight">
-            {item.store}
+            {typeof item.store === 'string' ? item.store : item.store?.name || item.storeName || 'CAD Bakery'}
           </h4>
           <p className="text-xs text-slate-500 font-medium mt-0.5 truncate">
             {item.packageTitle}

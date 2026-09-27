@@ -70,7 +70,7 @@ export default function EndingSoonSection({
               <div className="min-w-0 flex-1">
                 <div className="flex items-center justify-between text-[11px] text-slate-400 mb-0.5">
                   <span className="truncate max-w-[130px] font-medium text-slate-500">
-                    {item.store}
+                    {typeof item.store === 'string' ? item.store : item.store?.name || item.storeName || 'CAD Bakery'}
                   </span>
                   <span className="font-semibold text-slate-600 shrink-0">
                     {item.distance}

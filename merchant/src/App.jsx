@@ -24,6 +24,8 @@ export default function AdminApp() {
   const [verificationCode, setVerificationCode] = useState(null);
   const [isOpen, setIsOpen] = useState(true);
   const [toastMessage, setToastMessage] = useState(null);
+  const [hasPendingPickups, setHasPendingPickups] = useState(true);
+  const [latestListing, setLatestListing] = useState(null);
 
   const showToast = (msg) => {
     setToastMessage(msg);
@@ -38,6 +40,7 @@ export default function AdminApp() {
       <CreateListingPage
         onBack={() => setSubView(null)}
         onSave={(newListing) => {
+          setLatestListing(newListing);
           setSubView(null);
           setActiveTab('listings');
           showToast(`Published "${newListing.title}"!`);
@@ -122,6 +125,7 @@ export default function AdminApp() {
           {/* Right Controls: Order Notifications Center */}
           <div className="flex items-center gap-2">
             <OrderNotificationMenu
+              hasPendingPickups={hasPendingPickups}
               onNavigateToOrders={() => {
                 setSubView(null);
                 setActiveTab('orders');
@@ -130,6 +134,7 @@ export default function AdminApp() {
                 setVerificationCode(code);
                 setSubView('verify-pickup');
               }}
+              onNewOrder={() => setHasPendingPickups(true)}
               showToast={showToast}
             />
           </div>
@@ -150,7 +155,7 @@ export default function AdminApp() {
             onCompleteHandover={(data) => {
               setSubView(null);
               setVerificationCode(null);
-              showToast(`Handover completed for ${data.customerName}!`);
+              setHasPendingPickups(false);
             }}
           />
         ) : (
@@ -167,6 +172,7 @@ export default function AdminApp() {
             {/* Tab 2: Listings */}
             {activeTab === 'listings' && (
               <MerchantListings
+                newListing={latestListing}
                 onOpenCreate={() => setSubView('create-listing')}
                 onNavigateToProfile={() => setActiveTab('profile')}
               />
@@ -177,6 +183,12 @@ export default function AdminApp() {
               <MerchantOrders
                 onOpenVerify={() => setSubView('verify-pickup')}
                 onNavigateToProfile={() => setActiveTab('profile')}
+                onConfirmPickup={(remainingCount) => {
+                  setHasPendingPickups(remainingCount > 0);
+                }}
+                onPendingOrdersChange={(count) => {
+                  setHasPendingPickups(count > 0);
+                }}
               />
             )}
 

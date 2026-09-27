@@ -24,7 +24,8 @@ import {
 export default function MerchantListings({
   onOpenCreate,
   onNavigateToProfile,
-  onEditListing
+  onEditListing,
+  newListing
 }) {
   const [activeFilter, setActiveFilter] = useState('active');
   const [toastMessage, setToastMessage] = useState(null);
@@ -66,6 +67,9 @@ export default function MerchantListings({
     };
   };
 
+  // Listings State
+  const [listings, setListings] = useState([]);
+
   // Fetch initial listings from database
   const loadListings = async () => {
     setIsLoading(true);
@@ -85,8 +89,18 @@ export default function MerchantListings({
     loadListings();
   }, []);
 
-  // Listings State
-  const [listings, setListings] = useState([]);
+  // Prepend newly created listing immediately if received via prop
+  useEffect(() => {
+    if (newListing && newListing.id) {
+      setListings((prev) => {
+        const exists = prev.some((l) => l.id === newListing.id);
+        if (!exists) {
+          return [normalizeMerchantItem(newListing.raw || newListing), ...prev];
+        }
+        return prev;
+      });
+    }
+  }, [newListing]);
 
   const updateRemaining = async (id, delta) => {
     const current = listings.find((l) => l.id === id);

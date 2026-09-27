@@ -15,7 +15,7 @@ import {
 import { getMerchantOrders, verifyOrderPickup } from '../../services/api';
 import { socket } from '../../services/socket';
 
-export default function MerchantOrders({ onOpenVerify, onNavigateToProfile }) {
+export default function MerchantOrders({ onOpenVerify, onNavigateToProfile, onConfirmPickup, onPendingOrdersChange }) {
   const [activeFilter, setActiveFilter] = useState('all');
   const [toastMessage, setToastMessage] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -58,9 +58,10 @@ export default function MerchantOrders({ onOpenVerify, onNavigateToProfile }) {
         const completed = data.filter((o) => o.status === 'COMPLETED').map(normalizeOrder);
         setPendingOrders(pending);
         setCompletedOrders(completed);
+        if (onPendingOrdersChange) onPendingOrdersChange(pending.length);
       } else {
         // Fallback demo order
-        setPendingOrders([
+        const fallbackPending = [
           normalizeOrder({
             id: 'ord-demo',
             user: { name: 'Sarah Jenkins' },
@@ -73,7 +74,9 @@ export default function MerchantOrders({ onOpenVerify, onNavigateToProfile }) {
             status: 'PENDING',
             createdAt: new Date().toISOString(),
           }),
-        ]);
+        ];
+        setPendingOrders(fallbackPending);
+        if (onPendingOrdersChange) onPendingOrdersChange(fallbackPending.length);
       }
     } catch (err) {
       console.error('Failed to load orders:', err);
@@ -91,7 +94,11 @@ export default function MerchantOrders({ onOpenVerify, onNavigateToProfile }) {
     const handleOrderCreated = (data) => {
       const order = data?.order || data;
       const normalized = normalizeOrder(order);
-      setPendingOrders((prev) => [normalized, ...prev.filter((o) => o.id !== normalized.id)]);
+      setPendingOrders((prev) => {
+        const updated = [normalized, ...prev.filter((o) => o.id !== normalized.id)];
+        if (onPendingOrdersChange) onPendingOrdersChange(updated.length);
+        return updated;
+      });
       showToast(`🔔 New Order! ${normalized.customer} reserved 1x "${normalized.itemTitle}" (${normalized.code})`);
     };
 
@@ -100,37 +107,30 @@ export default function MerchantOrders({ onOpenVerify, onNavigateToProfile }) {
     return () => {
       socket.off('ORDER_CREATED', handleOrderCreated);
     };
-  }, []);
+  }, [onPendingOrdersChange]);
 
   const confirmPickup = async (order) => {
     try {
       await verifyOrderPickup(order.code);
-      setPendingOrders((prev) => prev.filter((o) => o.id !== order.id));
-      setCompletedOrders((prev) => [
-        {
-          id: order.id,
-          customer: order.customer,
-          orderNumber: order.orderNumber,
-          staff: 'Staff (You)',
-          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        },
-        ...prev,
-      ]);
-      showToast(`✅ Handover confirmed for ${order.customer} (${order.code})!`);
     } catch (err) {
-      showToast(`Verification note: ${err.message}`);
-      // Still allow UI handover
-      setPendingOrders((prev) => prev.filter((o) => o.id !== order.id));
-      setCompletedOrders((prev) => [
-        {
-          id: order.id,
-          customer: order.customer,
-          orderNumber: order.orderNumber,
-          staff: 'Staff (You)',
-          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        },
-        ...prev,
-      ]);
+      console.warn('Verification note:', err.message);
+    }
+
+    const remaining = pendingOrders.filter((o) => o.id !== order.id);
+    setPendingOrders(remaining);
+    setCompletedOrders((prev) => [
+      {
+        id: order.id,
+        customer: order.customer,
+        orderNumber: order.orderNumber,
+        staff: 'Staff (You)',
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      },
+      ...prev,
+    ]);
+
+    if (onConfirmPickup) {
+      onConfirmPickup(remaining.length);
     }
   };
 
@@ -191,7 +191,7 @@ export default function MerchantOrders({ onOpenVerify, onNavigateToProfile }) {
           }`}
         >
           <span className="w-2 h-2 rounded-full bg-amber-500" />
-          <span>Pending Pickup 6</span>
+          <span>Pending Pickup {pendingOrders.length}</span>
         </button>
 
         <button
@@ -207,14 +207,14 @@ export default function MerchantOrders({ onOpenVerify, onNavigateToProfile }) {
         </button>
       </div>
 
-      {/* Notice Banner: 6 Pickups Arriving + Verify Button */}
+      {/* Notice Banner: Pickups Arriving + Verify Button */}
       <div className="bg-[#FFEFE7] border border-orange-200/80 rounded-3xl p-4 flex items-center justify-between shadow-2xs">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-2xl bg-[#8C3A00] text-white flex items-center justify-center shrink-0">
             <Clock className="w-5 h-5" />
           </div>
           <div>
-            <h3 className="font-extrabold text-sm text-[#8C3A00]">6 pickups arriving</h3>
+            <h3 className="font-extrabold text-sm text-[#8C3A00]">{pendingOrders.length} {pendingOrders.length === 1 ? 'pickup' : 'pickups'} arriving</h3>
             <p className="text-xs text-[#8C3A00]/80">Between 6:30 PM – 7:30 PM (Current Rush)</p>
           </div>
         </div>

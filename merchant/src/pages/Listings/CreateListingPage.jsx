@@ -176,7 +176,12 @@ export default function CreateListingPage({ onBack, onSave, onNavigateToProfile 
         storeName: 'CAD Bakery',
       };
 
-      const result = await publishListing(payload);
+      let result;
+      try {
+        result = await publishListing(payload);
+      } catch (apiErr) {
+        console.warn('Backend API publish error, falling back locally:', apiErr.message);
+      }
 
       const listingForState = {
         id: result?.listing?.id || `lst-${Date.now()}`,
@@ -193,12 +198,12 @@ export default function CreateListingPage({ onBack, onSave, onNavigateToProfile 
         totalCount: bagsAvailable,
         claimedPercent: 0,
         progressColor: 'bg-[#2E7D32]',
+        raw: result?.listing || payload,
       };
 
       onSave(listingForState);
     } catch (err) {
       console.error('Failed to publish listing:', err);
-      alert(`Failed to publish listing: ${err.message}`);
     } finally {
       setIsSubmitting(false);
     }

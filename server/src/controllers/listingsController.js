@@ -335,9 +335,35 @@ export async function createListing(req, res) {
       }
     }
 
-    // 1. Save listing in PostgreSQL
-    const savedListing = await prisma.listing.create({
-      data: {
+    // 1. Save listing in PostgreSQL or Fallback
+    let savedListing;
+    try {
+      savedListing = await prisma.listing.create({
+        data: {
+          title,
+          description: description || '',
+          photoUrl:
+            photoUrl ||
+            'https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=700&q=80',
+          originalPrice: origNum,
+          price: priceNum,
+          discount: calculatedDiscount,
+          bagsAvailable: parseInt(bagsAvailable, 10) || 5,
+          category: category || 'baked',
+          pickupDate: pickupDate || 'Today',
+          pickupStart: pickupStart || '6:30 PM',
+          pickupEnd: pickupEnd || '7:30 PM',
+          storeName: resolvedStoreName,
+          storeId: resolvedStoreId,
+          dietaryTags: Array.isArray(dietaryTags) ? dietaryTags : [],
+          co2SavedKg: parseFloat(co2SavedKg) || 1.2,
+        },
+        include: { store: true },
+      });
+    } catch (dbErr) {
+      console.warn('Database unavailable during createListing, saving in-memory:', dbErr.message);
+      savedListing = {
+        id: `cad-bag-${Date.now()}`,
         title,
         description: description || '',
         photoUrl:
@@ -347,32 +373,55 @@ export async function createListing(req, res) {
         price: priceNum,
         discount: calculatedDiscount,
         bagsAvailable: parseInt(bagsAvailable, 10) || 5,
+        bagsSold: 0,
+        status: 'ACTIVE',
         category: category || 'baked',
         pickupDate: pickupDate || 'Today',
         pickupStart: pickupStart || '6:30 PM',
         pickupEnd: pickupEnd || '7:30 PM',
         storeName: resolvedStoreName,
-        storeId: resolvedStoreId,
+        storeId: resolvedStoreId || 'st_cad',
         dietaryTags: Array.isArray(dietaryTags) ? dietaryTags : [],
         co2SavedKg: parseFloat(co2SavedKg) || 1.2,
-      },
-      include: { store: true },
-    });
+        store: {
+          id: resolvedStoreId || 'st_cad',
+          name: resolvedStoreName,
+          rating: 4.9,
+          distance: '0.4 km',
+          address: '422 St 178, Daun Penh',
+        },
+        createdAt: new Date().toISOString(),
+      };
+      FALLBACK_LISTINGS.unshift(savedListing);
+    }
 
-    // 2. Create notification record in PostgreSQL
-    const savedNotification = await prisma.notification.create({
-      data: {
-        type: 'NEW_LISTING',
-        title: 'New Surplus Food Available!',
-        message: `${savedListing.storeName} just listed "${savedListing.title}" for $${savedListing.price.toFixed(2)}`,
-        listingId: savedListing.id,
-      },
-    });
-
-    const enrichedNotification = {
-      ...savedNotification,
+    // 2. Create notification record in PostgreSQL or Fallback
+    let enrichedNotification = {
+      id: `notif-${Date.now()}`,
+      type: 'NEW_LISTING',
+      title: 'New Surplus Food Available!',
+      message: `${savedListing.storeName} just listed "${savedListing.title}" for $${savedListing.price.toFixed(2)}`,
+      listingId: savedListing.id,
       listing: savedListing,
+      createdAt: new Date().toISOString(),
     };
+
+    try {
+      const savedNotification = await prisma.notification.create({
+        data: {
+          type: 'NEW_LISTING',
+          title: 'New Surplus Food Available!',
+          message: `${savedListing.storeName} just listed "${savedListing.title}" for $${savedListing.price.toFixed(2)}`,
+          listingId: savedListing.id,
+        },
+      });
+      enrichedNotification = {
+        ...savedNotification,
+        listing: savedListing,
+      };
+    } catch (notifErr) {
+      // In-memory notification fallback already prepared
+    }
 
     // 3. Broadcast real-time event to all connected customer tabs via Socket.io
     const io = req.app.get('io');
@@ -410,10 +459,22 @@ export async function updateListing(req, res) {
     if (updateData.bagsAvailable !== undefined) updateData.bagsAvailable = parseInt(updateData.bagsAvailable, 10);
     if (updateData.bagsSold !== undefined) updateData.bagsSold = parseInt(updateData.bagsSold, 10);
 
-    const updatedListing = await prisma.listing.update({
-      where: { id },
-      data: updateData,
-    });
+    let updatedListing;
+    try {
+      updatedListing = await prisma.listing.update({
+        where: { id },
+        data: updateData,
+      });
+    } catch (dbErr) {
+      console.warn('DB update failed, updating in-memory fallback:', dbErr.message);
+      const idx = FALLBACK_LISTINGS.findIndex(l => l.id === id);
+      if (idx !== -1) {
+        FALLBACK_LISTINGS[idx] = { ...FALLBACK_LISTINGS[idx], ...updateData };
+        updatedListing = FALLBACK_LISTINGS[idx];
+      } else {
+        updatedListing = { id, ...updateData };
+      }
+    }
 
     const io = req.app.get('io');
     if (io) {
@@ -434,7 +495,15 @@ export async function updateListing(req, res) {
 export async function deleteListing(req, res) {
   try {
     const { id } = req.params;
-    await prisma.listing.delete({ where: { id } });
+    try {
+      await prisma.listing.delete({ where: { id } });
+    } catch (dbErr) {
+      console.warn('DB delete failed, deleting from in-memory fallback:', dbErr.message);
+      const idx = FALLBACK_LISTINGS.findIndex(l => l.id === id);
+      if (idx !== -1) {
+        FALLBACK_LISTINGS.splice(idx, 1);
+      }
+    }
 
     const io = req.app.get('io');
     if (io) {

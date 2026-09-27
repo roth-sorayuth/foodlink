@@ -29,9 +29,9 @@ export default function CustomerCheckoutFlow({
   const [timerSeconds, setTimerSeconds] = useState(580); // 09:40
 
   const title = listing?.title || 'Artisan Pastry & Sourdough Surprise Bag';
-  const storeName = listing?.store || listing?.storeName || listing?.store?.name || 'CAD Bakery';
+  const storeName = (typeof listing?.store === 'string' ? listing.store : listing?.store?.name) || listing?.storeName || 'CAD Bakery';
   const image = listing?.image || listing?.photoUrl || 'https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=300&q=80';
-  const address = listing?.address || listing?.store?.address || '422 St 178, Daun Penh';
+  const address = (typeof listing?.address === 'string' ? listing.address : listing?.store?.address) || '422 St 178, Daun Penh';
   const pickupWindow = listing?.pickupTime || `${listing?.pickupStart || '6:30 PM'} – ${listing?.pickupEnd || '7:30 PM'}`;
 
   const priceNum = typeof listing?.price === 'number'

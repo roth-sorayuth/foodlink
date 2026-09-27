@@ -22,11 +22,11 @@ export default function CustomerListingDetail({
 
   // Dynamic listing properties with clean defaults
   const title = listing?.title || 'Artisan Sourdough & Croissant Surprise Box';
-  const storeName = listing?.store || listing?.storeName || listing?.store?.name || 'CAD Bakery';
+  const storeName = (typeof listing?.store === 'string' ? listing.store : listing?.store?.name) || listing?.storeName || 'CAD Bakery';
   const category = listing?.category || 'Pastry';
   const image = listing?.image || listing?.photoUrl || 'https://images.unsplash.com/photo-1555507036-ab1f4038808a?auto=format&fit=crop&w=1000&q=80';
-  const address = listing?.address || listing?.store?.address || '422 St 178, Daun Penh';
-  const rating = listing?.rating || listing?.store?.rating || '4.9';
+  const address = (typeof listing?.address === 'string' ? listing.address : listing?.store?.address) || '422 St 178, Daun Penh';
+  const rating = (typeof listing?.rating === 'string' || typeof listing?.rating === 'number' ? listing.rating : listing?.store?.rating) || '4.9';
   const bags = listing?.remaining !== undefined ? listing.remaining : (listing?.bagsAvailable || 3);
   const pickupWindow = listing?.pickupTime || `${listing?.pickupStart || '6:30 PM'} – ${listing?.pickupEnd || '7:30 PM'}`;
   const description = listing?.description || "Assortment of fresh surplus bakery items prepared today. Contents vary based on daily unsold surplus.";

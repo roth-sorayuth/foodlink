@@ -64,7 +64,7 @@ export default function OrderClaimModal({ isOpen, onClose, item, onConfirmOrder 
           {/* Store & Pickup Schedule */}
           <div className="flex items-center justify-between p-3 rounded-2xl bg-slate-50 border border-slate-200/70 text-xs">
             <div>
-              <p className="font-bold text-slate-900">{item.store}</p>
+              <p className="font-bold text-slate-900">{typeof item.store === 'string' ? item.store : item.store?.name || item.storeName || 'CAD Bakery'}</p>
               <p className="text-slate-500 flex items-center gap-1 mt-0.5">
                 <MapPin className="w-3 h-3 text-slate-400" />
                 {item.distance} away

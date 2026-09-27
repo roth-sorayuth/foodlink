@@ -15,7 +15,7 @@ import {
 import { getNotifications, getMerchantOrders, markAllNotificationsAsRead, markNotificationAsRead } from '../../services/api';
 import { socket } from '../../services/socket';
 
-export default function OrderNotificationMenu({ onNavigateToOrders, onOpenVerify, showToast }) {
+export default function OrderNotificationMenu({ onNavigateToOrders, onOpenVerify, showToast, hasPendingPickups = true, onNewOrder }) {
   const [isOpen, setIsOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -159,6 +159,9 @@ export default function OrderNotificationMenu({ onNavigateToOrders, onOpenVerify
       setNotifications((prev) => [newNotification, ...prev]);
       setUnreadCount((prev) => prev + 1);
       setHasNewAlert(true);
+      if (onNewOrder) {
+        onNewOrder();
+      }
 
       if (showToast) {
         showToast(`🔔 New Order! ${newNotification.customerName} claimed ${newNotification.itemTitle} (${newNotification.pickupCode})`);
@@ -170,7 +173,7 @@ export default function OrderNotificationMenu({ onNavigateToOrders, onOpenVerify
     return () => {
       socket.off('ORDER_CREATED', handleNewOrder);
     };
-  }, []);
+  }, [onNewOrder]);
 
   const handleMarkAllRead = async () => {
     try {
@@ -233,6 +236,9 @@ export default function OrderNotificationMenu({ onNavigateToOrders, onOpenVerify
     setNotifications((prev) => [mockOrder, ...prev]);
     setUnreadCount((prev) => prev + 1);
     setHasNewAlert(true);
+    if (onNewOrder) {
+      onNewOrder();
+    }
     if (showToast) {
       showToast(`🔔 Demo Order Created! ${picked.name} reserved ${picked.item}`);
     }
@@ -241,44 +247,32 @@ export default function OrderNotificationMenu({ onNavigateToOrders, onOpenVerify
   return (
     <div className="relative" ref={menuRef}>
       
-      {/* 1. Header Trigger Pill Button replacing • Open */}
+      {/* 1. Header Trigger Pill Button */}
       <button
         onClick={() => {
           setIsOpen(!isOpen);
-          setHasNewAlert(false);
         }}
         aria-label="View customer order notifications"
         className={`relative inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-bold transition-all shadow-2xs active:scale-95 cursor-pointer ${
           isOpen
             ? 'bg-[#2E7D32] text-white ring-2 ring-[#2E7D32]/30 shadow-sm'
-            : unreadCount > 0
+            : hasPendingPickups
             ? 'bg-emerald-50 text-[#2E7D32] border border-emerald-300 hover:bg-emerald-100/80'
             : 'bg-white text-stone-700 border border-stone-200/90 hover:bg-stone-50'
         }`}
       >
         {/* Bell Icon with Real-Time Ping */}
         <div className="relative">
-          <Bell className={`w-4 h-4 ${isOpen ? 'text-white' : 'text-[#2E7D32]'} ${hasNewAlert ? 'animate-bounce' : ''}`} />
-          {unreadCount > 0 && (
-            <span className="absolute -top-1 -right-1 flex h-2 w-2">
+          <Bell className={`w-4 h-4 ${isOpen ? 'text-white' : 'text-[#2E7D32]'}`} />
+          {hasPendingPickups && (
+            <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#FF8A3D] opacity-75" />
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-[#FF8A3D]" />
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-[#FF8A3D] ring-2 ring-white shadow-xs" />
             </span>
           )}
         </div>
 
         <span>Orders</span>
-
-        {/* Counter Badge */}
-        {unreadCount > 0 ? (
-          <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-black transition-colors ${
-            isOpen ? 'bg-white text-[#2E7D32]' : 'bg-[#2E7D32] text-white'
-          }`}>
-            {unreadCount}
-          </span>
-        ) : (
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-        )}
       </button>
 
       {/* 2. Order Notifications Dropdown Menu */}
