@@ -69,3 +69,64 @@ export async function getNotifications() {
     return [];
   }
 }
+
+/**
+ * Mark a single notification as read
+ */
+export async function markNotificationAsRead(id) {
+  try {
+    const res = await fetch(`${API_BASE_URL}/notifications/${id}/read`, {
+      method: 'PATCH',
+    });
+    if (!res.ok) throw new Error('Failed to mark notification as read');
+    return await res.json();
+  } catch (error) {
+    console.error('Error marking notification as read:', error);
+    return null;
+  }
+}
+
+/**
+ * Mark all notifications as read
+ */
+export async function markAllNotificationsAsRead() {
+  try {
+    const res = await fetch(`${API_BASE_URL}/notifications/read-all`, {
+      method: 'PATCH',
+    });
+    if (!res.ok) throw new Error('Failed to mark all notifications as read');
+    return await res.json();
+  } catch (error) {
+    console.error('Error marking all notifications as read:', error);
+    return null;
+  }
+}
+
+/**
+ * Play pleasant synthesizer chime on real-time alerts
+ */
+export function playNotificationSound() {
+  try {
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContext) return;
+    const ctx = new AudioContext();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+
+    osc.type = 'sine';
+    const now = ctx.currentTime;
+    osc.frequency.setValueAtTime(659.25, now); // E5 note
+    osc.frequency.setValueAtTime(987.77, now + 0.12); // B5 note
+
+    gain.gain.setValueAtTime(0.18, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
+
+    osc.start(now);
+    osc.stop(now + 0.5);
+  } catch {
+    // Autoplay restrictions or unsupported audio context
+  }
+}

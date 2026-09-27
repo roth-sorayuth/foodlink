@@ -98,6 +98,17 @@ export async function createListing(req, res) {
         ? `${Math.round(((origNum - priceNum) / origNum) * 100)}% OFF`
         : '50% OFF');
 
+    // Verify storeId exists in DB to prevent foreign key errors
+    let resolvedStoreId = null;
+    let resolvedStoreName = storeName || 'CAD Bakery';
+    if (storeId) {
+      const storeExists = await prisma.store.findUnique({ where: { id: storeId } });
+      if (storeExists) {
+        resolvedStoreId = storeId;
+        resolvedStoreName = storeExists.name || resolvedStoreName;
+      }
+    }
+
     // 1. Save listing in PostgreSQL
     const savedListing = await prisma.listing.create({
       data: {
@@ -114,11 +125,12 @@ export async function createListing(req, res) {
         pickupDate: pickupDate || 'Today',
         pickupStart: pickupStart || '6:30 PM',
         pickupEnd: pickupEnd || '7:30 PM',
-        storeName: storeName || 'Artisan Bakery & Cafe',
-        storeId: storeId || null,
+        storeName: resolvedStoreName,
+        storeId: resolvedStoreId,
         dietaryTags: Array.isArray(dietaryTags) ? dietaryTags : [],
         co2SavedKg: parseFloat(co2SavedKg) || 1.2,
       },
+      include: { store: true },
     });
 
     // 2. Create notification record in PostgreSQL
@@ -131,20 +143,26 @@ export async function createListing(req, res) {
       },
     });
 
+    const enrichedNotification = {
+      ...savedNotification,
+      listing: savedListing,
+    };
+
     // 3. Broadcast real-time event to all connected customer tabs via Socket.io
     const io = req.app.get('io');
     if (io) {
       io.emit('NEW_LISTING', {
         listing: savedListing,
-        notification: savedNotification,
+        notification: enrichedNotification,
       });
+      io.emit('NOTIFICATION_RECEIVED', enrichedNotification);
       console.log(`[Socket.io] Broadcasted NEW_LISTING: "${savedListing.title}"`);
     }
 
     return res.status(201).json({
       success: true,
       listing: savedListing,
-      notification: savedNotification,
+      notification: enrichedNotification,
     });
   } catch (error) {
     console.error('Error creating listing:', error);
