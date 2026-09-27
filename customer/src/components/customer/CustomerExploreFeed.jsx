@@ -67,8 +67,104 @@ export default function CustomerExploreFeed({
     };
   };
 
-  // Curated demo listings matching the exact screenshot visual references
+  // Curated demo listings highlighting CAD Bakery for demo
   const fallbackListings = [
+    {
+      id: 'cad-sourdough-box',
+      store: 'CAD Bakery',
+      storeLogo: '/cad-bakery-logo.png',
+      title: 'Artisan Sourdough & Croissant Surprise Box',
+      image: 'https://images.unsplash.com/photo-1555507036-ab1f4038808a?auto=format&fit=crop&w=800&q=80',
+      rating: '4.9',
+      distance: '0.4 km',
+      pickupTime: '6:30 PM–7:30 PM',
+      address: '422 St 178, Daun Penh',
+      price: '$4.99',
+      originalPrice: '$16.00',
+      remaining: 4,
+      category: 'Pastry',
+      description: 'Artisanal European sourdough loaves, buttery croissants, and morning viennoiserie baked fresh today.',
+    },
+    {
+      id: 'cad-croissant-bundle',
+      store: 'CAD Bakery',
+      storeLogo: '/cad-bakery-logo.png',
+      title: 'French Butter Croissant & Viennoiserie Bag',
+      image: 'https://images.unsplash.com/photo-1549931319-a545dcf3bc73?auto=format&fit=crop&w=800&q=80',
+      rating: '4.9',
+      distance: '0.4 km',
+      pickupTime: '6:00 PM–7:30 PM',
+      address: '422 St 178, Daun Penh',
+      price: '$3.99',
+      originalPrice: '$13.50',
+      remaining: 5,
+      category: 'Pastry',
+      description: 'Pure French butter croissants, almond escargot pastries, chocolate swirls, and brioche rolls.',
+    },
+    {
+      id: 'cad-rustic-breads',
+      store: 'CAD Bakery',
+      storeLogo: '/cad-bakery-logo.png',
+      title: 'Rustic Country Sourdough & Baguette Pack',
+      image: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=800&q=80',
+      rating: '4.9',
+      distance: '0.4 km',
+      pickupTime: '6:30 PM–8:00 PM',
+      address: '422 St 178, Daun Penh',
+      price: '$3.50',
+      originalPrice: '$12.00',
+      remaining: 3,
+      category: 'Pastry',
+      description: 'Two full-size artisan sourdough boules and crispy European baguettes freshly baked with organic wheat flour.',
+    },
+    {
+      id: 'cad-sweet-dessert-box',
+      store: 'CAD Bakery',
+      storeLogo: '/cad-bakery-logo.png',
+      title: 'Sweet Tartlets, Cakes & Danish Treats',
+      image: 'https://images.unsplash.com/photo-1578985545062-69928b1d9587?auto=format&fit=crop&w=800&q=80',
+      rating: '4.9',
+      distance: '0.4 km',
+      pickupTime: '7:00 PM–8:30 PM',
+      address: '422 St 178, Daun Penh',
+      price: '$4.50',
+      originalPrice: '$15.00',
+      remaining: 3,
+      category: 'Dessert',
+      description: 'Fresh fruit tarts, custard brioches, cinnamon glazed knots, and seasonal pastry slices from today.',
+    },
+    {
+      id: 'cad-savory-focaccia',
+      store: 'CAD Bakery',
+      storeLogo: '/cad-bakery-logo.png',
+      title: 'Savory Focaccia & Stuffed Brioche Box',
+      image: 'https://images.unsplash.com/photo-1528735602780-2552fd46c7af?auto=format&fit=crop&w=800&q=80',
+      rating: '4.9',
+      distance: '0.4 km',
+      pickupTime: '6:00 PM–7:30 PM',
+      address: '422 St 178, Daun Penh',
+      price: '$4.20',
+      originalPrice: '$14.00',
+      remaining: 2,
+      category: 'Food',
+      description: 'Rosemary sea salt focaccia squares, ham and gruyere melt twists, and savory olive rolls.',
+    },
+    {
+      id: 'cad-coffee-pastry-pair',
+      store: 'CAD Bakery',
+      storeLogo: '/cad-bakery-logo.png',
+      title: 'Barista Cold Brew & Afternoon Pastry Pair',
+      image: 'https://images.unsplash.com/photo-1517256064527-09c73fc73e38?auto=format&fit=crop&w=800&q=80',
+      rating: '4.9',
+      distance: '0.4 km',
+      pickupTime: '5:30 PM–7:00 PM',
+      address: '422 St 178, Daun Penh',
+      price: '$2.90',
+      originalPrice: '$9.00',
+      remaining: 6,
+      category: 'Drinks',
+      description: 'Bottled organic cold brew coffee or iced matcha latte paired with two fresh breakfast pastries.',
+    },
     {
       id: 'mori-bistro',
       store: 'Mori Bistro',
@@ -81,7 +177,8 @@ export default function CustomerExploreFeed({
       price: '$1.80',
       originalPrice: '$3.60',
       remaining: 3,
-      category: 'Meals',
+      category: 'Food',
+      description: 'Fresh teriyaki chicken, katsu curry, or daily sushi roll surplus prepared today.',
     },
     {
       id: 'aus-bake',
@@ -95,22 +192,8 @@ export default function CustomerExploreFeed({
       price: '$2.50',
       originalPrice: '$5.00',
       remaining: 5,
-      category: 'Bakery',
-    },
-    {
-      id: 'gg-bakery',
-      store: 'CAD Bakery',
-      storeLogo: '/cad-bakery-logo.png',
-      title: 'Artisan Sourdough & Croissant Surprise Box',
-      image: 'https://images.unsplash.com/photo-1555507036-ab1f4038808a?auto=format&fit=crop&w=800&q=80',
-      rating: '4.9',
-      distance: '0.4 km',
-      pickupTime: '6:30 PM–7:30 PM',
-      address: '422 St 178, Daun Penh',
-      price: '$4.99',
-      originalPrice: '$16.00',
-      remaining: 4,
       category: 'Pastry',
+      description: 'Assortment of fresh meat pies, sausage rolls, spinach feta parcels and sweet danishes.',
     },
     {
       id: 'green-earth',
@@ -124,7 +207,8 @@ export default function CustomerExploreFeed({
       price: '$6.50',
       originalPrice: '$22.00',
       remaining: 2,
-      category: 'Groceries',
+      category: 'Healthy',
+      description: 'Assorted seasonal organic vegetables, fruit basket, and dairy surplus items.',
     },
   ];
 
@@ -197,11 +281,35 @@ export default function CustomerExploreFeed({
     );
   };
 
-  // Filter listings based on search query
+  // Comprehensive, instant filtering based on active category & search query
   const filteredListings = listings.filter((item) => {
-    if (!searchQuery) return true;
-    const q = searchQuery.toLowerCase();
-    return item.store.toLowerCase().includes(q) || item.title?.toLowerCase().includes(q) || item.address?.toLowerCase().includes(q);
+    // 1. Category filter
+    const itemCat = (item.category || '').toLowerCase();
+    const itemTitle = (item.title || '').toLowerCase();
+    const activeCatLower = activeCategory.toLowerCase();
+
+    let matchesCategory = true;
+    if (activeCategory !== 'All') {
+      matchesCategory =
+        itemCat === activeCatLower ||
+        itemCat.includes(activeCatLower) ||
+        (activeCatLower === 'pastry' && (itemCat.includes('bak') || itemTitle.includes('pastry') || itemTitle.includes('bread') || itemTitle.includes('croissant'))) ||
+        (activeCatLower === 'food' && (itemCat.includes('meal') || itemCat.includes('food') || itemCat.includes('bento'))) ||
+        (activeCatLower === 'asian' && (itemTitle.includes('donburi') || itemTitle.includes('bento') || itemCat.includes('asian') || itemCat.includes('japanese')));
+    }
+
+    if (!matchesCategory) return false;
+
+    // 2. Search query filter
+    if (!searchQuery.trim()) return true;
+    const q = searchQuery.toLowerCase().trim();
+    return (
+      (item.store || '').toLowerCase().includes(q) ||
+      (item.title || '').toLowerCase().includes(q) ||
+      (item.address || '').toLowerCase().includes(q) ||
+      (item.category || '').toLowerCase().includes(q) ||
+      (item.description || '').toLowerCase().includes(q)
+    );
   });
 
   return (
@@ -216,8 +324,17 @@ export default function CustomerExploreFeed({
             placeholder="Search by location, station, store name..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-11 pr-4 py-3 bg-white border border-stone-200/90 rounded-full text-xs sm:text-sm font-medium text-[#1C1C1E] placeholder:text-stone-400 shadow-xs focus:ring-1 focus:ring-[#2E7D32] outline-none transition-all"
+            className="w-full pl-11 pr-10 py-3 bg-white border border-stone-200/90 rounded-full text-xs sm:text-sm font-medium text-[#1C1C1E] placeholder:text-stone-400 shadow-xs focus:ring-1 focus:ring-[#2E7D32] outline-none transition-all"
           />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery('')}
+              className="absolute right-3.5 top-1/2 -translate-y-1/2 p-1 rounded-full text-stone-400 hover:text-stone-700 hover:bg-stone-100 cursor-pointer"
+              title="Clear search"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
         </div>
 
         {/* Notification Bell with Real-Time Badge */}
@@ -242,6 +359,24 @@ export default function CustomerExploreFeed({
           )}
         </button>
       </div>
+
+      {/* Search results counter when searching */}
+      {searchQuery.trim() && (
+        <div className="flex items-center justify-between px-3.5 py-2 rounded-2xl bg-emerald-50 border border-emerald-200/80 text-xs">
+          <div className="flex items-center gap-2 text-[#1b5e20] font-bold">
+            <Search className="w-3.5 h-3.5 text-[#2E7D32]" />
+            <span>
+              Found {filteredListings.length} surplus bag{filteredListings.length !== 1 ? 's' : ''} matching "{searchQuery}"
+            </span>
+          </div>
+          <button
+            onClick={() => setSearchQuery('')}
+            className="text-[11px] font-extrabold text-[#2E7D32] hover:underline cursor-pointer"
+          >
+            Clear
+          </button>
+        </div>
+      )}
 
       {/* Live Surplus Drop Announcement Banner */}
       {liveBannerListing && (
@@ -426,6 +561,27 @@ export default function CustomerExploreFeed({
           <div className="py-12 text-center space-y-2">
             <div className="w-8 h-8 border-3 border-[#2E7D32] border-t-transparent rounded-full animate-spin mx-auto" />
             <p className="text-xs font-bold text-stone-500">Loading nearby surplus bags...</p>
+          </div>
+        ) : filteredListings.length === 0 ? (
+          <div className="p-8 text-center bg-white rounded-3xl border border-stone-200/80 shadow-2xs space-y-3">
+            <div className="w-12 h-12 rounded-full bg-stone-100 text-stone-400 flex items-center justify-center mx-auto text-xl">
+              🔍
+            </div>
+            <div>
+              <h3 className="font-extrabold text-sm text-[#1C1C1E]">No surplus bags found</h3>
+              <p className="text-xs text-stone-500 mt-1 max-w-xs mx-auto">
+                {searchQuery ? `No results matching "${searchQuery}". Try searching for another store, bakery, or dish.` : 'No bags currently available in this category.'}
+              </p>
+            </div>
+            <button
+              onClick={() => {
+                setSearchQuery('');
+                setActiveCategory('All');
+              }}
+              className="px-4 py-2 rounded-xl bg-[#2E7D32] hover:bg-[#256629] text-white text-xs font-bold shadow-xs cursor-pointer transition-colors"
+            >
+              Clear Search & Reset
+            </button>
           </div>
         ) : (
           <div className="space-y-4">

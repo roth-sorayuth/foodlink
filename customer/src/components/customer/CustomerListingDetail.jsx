@@ -21,11 +21,11 @@ export default function CustomerListingDetail({
   const [quantity, setQuantity] = useState(initialQuantity);
 
   // Dynamic listing properties with clean defaults
-  const title = listing?.title || 'Artisan Pastry & Sourdough Surprise Bag';
-  const storeName = listing?.store || listing?.storeName || listing?.store?.name || 'Golden Gate Bakery & Cafe';
-  const category = listing?.category || 'Bakery & Pastries';
-  const image = listing?.image || listing?.photoUrl || 'https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=1000&q=80';
-  const address = listing?.address || listing?.store?.address || '542 Valencia St, San Francisco';
+  const title = listing?.title || 'Artisan Sourdough & Croissant Surprise Box';
+  const storeName = listing?.store || listing?.storeName || listing?.store?.name || 'CAD Bakery';
+  const category = listing?.category || 'Pastry';
+  const image = listing?.image || listing?.photoUrl || 'https://images.unsplash.com/photo-1555507036-ab1f4038808a?auto=format&fit=crop&w=1000&q=80';
+  const address = listing?.address || listing?.store?.address || '422 St 178, Daun Penh';
   const rating = listing?.rating || listing?.store?.rating || '4.9';
   const bags = listing?.remaining !== undefined ? listing.remaining : (listing?.bagsAvailable || 3);
   const pickupWindow = listing?.pickupTime || `${listing?.pickupStart || '6:30 PM'} – ${listing?.pickupEnd || '7:30 PM'}`;

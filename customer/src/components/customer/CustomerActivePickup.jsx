@@ -19,7 +19,7 @@ export default function CustomerActivePickup({
   onNavigateToProfile
 }) {
   const orderId = order?.orderId || 'FS-84920';
-  const storeName = order?.listing?.store || order?.storeName || 'Golden Gate Bakery & Cafe';
+  const storeName = order?.listing?.store || order?.storeName || 'CAD Bakery';
   const quantity = order?.quantity || 1;
   const digits = (order?.digits && order.digits.length === 6)
     ? order.digits

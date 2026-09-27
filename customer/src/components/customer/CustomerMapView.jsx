@@ -58,6 +58,16 @@ export default function CustomerMapView({ listings = [], onSelectListing, onBack
     },
   ];
 
+  const filteredPins = pins.filter((p) => {
+    if (!searchQuery.trim()) return true;
+    const q = searchQuery.toLowerCase().trim();
+    return (
+      p.name?.toLowerCase().includes(q) ||
+      p.category?.toLowerCase().includes(q) ||
+      p.street?.toLowerCase().includes(q)
+    );
+  });
+
   return (
     <div className="relative w-full h-[calc(100vh-140px)] sm:h-[calc(100vh-120px)] rounded-3xl overflow-hidden bg-[#162130] text-white shadow-xl flex flex-col font-sans select-none">
       
@@ -70,8 +80,16 @@ export default function CustomerMapView({ listings = [], onSelectListing, onBack
             placeholder="Search for stores or locations..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-3 pr-2 text-xs sm:text-sm font-medium text-stone-800 placeholder:text-stone-400 outline-none bg-transparent"
+            className="w-full pl-3 pr-8 text-xs sm:text-sm font-medium text-stone-800 placeholder:text-stone-400 outline-none bg-transparent"
           />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery('')}
+              className="p-1 rounded-full text-stone-400 hover:text-stone-700 cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
         </div>
       </div>
 
