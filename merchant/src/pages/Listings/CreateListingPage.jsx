@@ -15,7 +15,101 @@ import {
   Leaf
 } from 'lucide-react';
 
+import { publishListing } from '../../services/api';
+
+const CATEGORY_PRESETS = {
+  bakery: [
+    {
+      title: 'Artisan Pastry & Sourdough Surprise Bag',
+      description: "Assortment of today's fresh unsold sourdough loaves, flaky croissants, and daily brioche buns. 100% fresh surplus.",
+      retailValue: '16.00',
+      foodSaverPrice: '4.99',
+      image: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=800&q=80',
+      dietaryTags: ['vegetarian'],
+    },
+    {
+      title: 'French Almond Croissant & Pain au Chocolat Box',
+      description: 'Double-baked buttery almond croissants and rich Belgian chocolate viennoiseries packed fresh at closing.',
+      retailValue: '14.00',
+      foodSaverPrice: '4.20',
+      image: 'https://images.unsplash.com/photo-1555507036-ab1f4038808a?auto=format&fit=crop&w=800&q=80',
+      dietaryTags: ['vegetarian'],
+    },
+    {
+      title: 'Crusty Baguette & Artisan Country Loaf Duo',
+      description: 'Twin crusty golden baguettes with a rustic country boule made from slow-fermented organic wild yeast.',
+      retailValue: '12.00',
+      foodSaverPrice: '3.50',
+      image: 'https://images.unsplash.com/photo-1549931319-a545dcf3bc73?auto=format&fit=crop&w=800&q=80',
+      dietaryTags: ['vegan'],
+    },
+  ],
+  meals: [
+    {
+      title: "Chef's Surplus Evening Bento & Hot Delights",
+      description: 'Hearty evening meal with teriyaki glazed protein, seasoned jasmine rice, crispy gyoza dumplings, and vegetables.',
+      retailValue: '18.00',
+      foodSaverPrice: '5.99',
+      image: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=800&q=80',
+      dietaryTags: ['halal'],
+    },
+    {
+      title: 'Gourmet Loaded Burger & Crispy Fries Box',
+      description: 'Handcrafted artisan burger with house-cut fries, onion rings, and signature dipping sauces.',
+      retailValue: '17.50',
+      foodSaverPrice: '5.49',
+      image: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=800&q=80',
+      dietaryTags: [],
+    },
+    {
+      title: 'Artisan Woodfired Pizza & Garlic Focaccia Bag',
+      description: 'Slices of today’s freshly fired stone-hearth pizza with herb garlic breadsticks.',
+      retailValue: '16.00',
+      foodSaverPrice: '4.99',
+      image: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=800&q=80',
+      dietaryTags: ['vegetarian'],
+    },
+  ],
+  produce: [
+    {
+      title: 'Fresh Organic Produce & Seasonal Greens Box',
+      description: 'Crisp organic lettuces, heirloom carrots, ripe avocados, vine tomatoes, and seasonal orchard fruits.',
+      retailValue: '22.00',
+      foodSaverPrice: '6.50',
+      image: 'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=800&q=80',
+      dietaryTags: ['organic', 'vegan'],
+    },
+    {
+      title: 'Surplus Ripe Tropical Fruits & Citrus Mystery Pack',
+      description: 'Sweet ripe pineapples, mangoes, clementines, and organic berries ready for eating or smoothies.',
+      retailValue: '18.00',
+      foodSaverPrice: '5.20',
+      image: 'https://images.unsplash.com/photo-1610832958506-aa56368176cf?auto=format&fit=crop&w=800&q=80',
+      dietaryTags: ['organic', 'vegan'],
+    },
+  ],
+  deli: [
+    {
+      title: 'Artisanal Dairy, Eggs & Farm Cheese Bag',
+      description: 'Farm-fresh milk, organic cultured butter, artisan cheeses, and pasture-raised eggs near sell-by date.',
+      retailValue: '24.00',
+      foodSaverPrice: '7.50',
+      image: 'https://images.unsplash.com/photo-1486297678162-eb2a19b0a32d?auto=format&fit=crop&w=800&q=80',
+      dietaryTags: ['organic', 'vegetarian'],
+    },
+    {
+      title: 'Deli Sliced Cold Cuts & Artisan Panini Bundle',
+      description: 'Assorted roasted turkey breast, cured prosciutto, and fresh baked focaccia panini bread.',
+      retailValue: '20.00',
+      foodSaverPrice: '6.00',
+      image: 'https://images.unsplash.com/photo-1509722747041-616f39b57569?auto=format&fit=crop&w=800&q=80',
+      dietaryTags: [],
+    },
+  ],
+};
+
 export default function CreateListingPage({ onBack, onSave, onNavigateToProfile }) {
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [photoUrl, setPhotoUrl] = useState(
     'https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=800&q=80'
   );
@@ -31,6 +125,19 @@ export default function CreateListingPage({ onBack, onSave, onNavigateToProfile 
   const [pickupDate, setPickupDate] = useState('today');
   const [startTime, setStartTime] = useState('6:30 PM');
   const [endTime, setEndTime] = useState('7:30 PM');
+  const [presetToast, setPresetToast] = useState(null);
+
+  // Apply a category preset when merchant clicks "+"
+  const handleApplyPreset = (preset) => {
+    setBagName(preset.title);
+    setDescription(preset.description);
+    setRetailValue(preset.retailValue);
+    setFoodSaverPrice(preset.foodSaverPrice);
+    setPhotoUrl(preset.image);
+    if (preset.dietaryTags) setDietaryTags(preset.dietaryTags);
+    setPresetToast(`Loaded preset: "${preset.title}"!`);
+    setTimeout(() => setPresetToast(null), 3000);
+  };
 
   // Computed values
   const retailNum = parseFloat(retailValue) || 16.0;
@@ -46,30 +153,73 @@ export default function CreateListingPage({ onBack, onSave, onNavigateToProfile 
     );
   };
 
-  const handlePublish = (e) => {
+  const handlePublish = async (e) => {
     e.preventDefault();
-    const newListing = {
-      id: `lst-${Date.now()}`,
-      title: bagName,
-      description,
-      image: photoUrl,
-      status: 'Active',
-      tagText: `${bagsAvailable} left!`,
-      tagColor: 'bg-amber-500 text-white',
-      pickupWindow: `Pickup ${startTime} - ${endTime}`,
-      price: `$${priceNum.toFixed(2)}`,
-      originalValue: `$${retailNum.toFixed(2)} value`,
-      soldCount: 0,
-      totalCount: bagsAvailable,
-      claimedPercent: 0,
-      progressColor: 'bg-[#2E7D32]'
-    };
-    onSave(newListing);
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+
+    try {
+      const payload = {
+        title: bagName,
+        description,
+        photoUrl,
+        category: selectedCategory,
+        originalPrice: retailNum,
+        price: priceNum,
+        discount: `${discountPercent}% OFF`,
+        bagsAvailable,
+        pickupDate: pickupDate === 'today' ? 'Today' : 'Tomorrow',
+        pickupStart: startTime,
+        pickupEnd: endTime,
+        dietaryTags,
+        storeId: 'st_cad',
+        storeName: 'CAD Bakery',
+      };
+
+      const result = await publishListing(payload);
+
+      const listingForState = {
+        id: result?.listing?.id || `lst-${Date.now()}`,
+        title: bagName,
+        description,
+        image: photoUrl,
+        status: 'Active',
+        tagText: `${bagsAvailable} left!`,
+        tagColor: 'bg-amber-500 text-white',
+        pickupWindow: `Pickup ${startTime} - ${endTime}`,
+        price: `$${priceNum.toFixed(2)}`,
+        originalValue: `$${retailNum.toFixed(2)} value`,
+        soldCount: 0,
+        totalCount: bagsAvailable,
+        claimedPercent: 0,
+        progressColor: 'bg-[#2E7D32]',
+      };
+
+      onSave(listingForState);
+    } catch (err) {
+      console.error('Failed to publish listing:', err);
+      alert(`Failed to publish listing: ${err.message}`);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
-    <div className="min-h-screen bg-[#F5F5F7] text-[#1C1C1E] flex flex-col font-sans pb-28 antialiased selection:bg-[#2E7D32] selection:text-white">
+    <div className="min-h-screen bg-[#F5F5F7] text-[#1C1C1E] flex flex-col font-sans pb-28 antialiased selection:bg-[#2E7D32] selection:text-white relative">
       
+      {/* Toast Alert for Preset Loading */}
+      {presetToast && (
+        <div className="fixed top-4 inset-x-4 max-w-sm mx-auto z-50 bg-[#1C1C1E] text-white text-xs font-semibold px-4 py-3 rounded-2xl shadow-xl border border-stone-700 flex items-center justify-between gap-3 animate-in fade-in slide-in-from-top-3">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+            <span>{presetToast}</span>
+          </div>
+          <button onClick={() => setPresetToast(null)} className="text-stone-400 hover:text-white">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
       {/* Top Header */}
       <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-stone-200/80 px-4 py-3">
         <div className="max-w-md sm:max-w-xl mx-auto flex items-center justify-between">
@@ -80,8 +230,8 @@ export default function CreateListingPage({ onBack, onSave, onNavigateToProfile 
             >
               <ArrowLeft className="w-5 h-5" />
             </button>
-            <div className="w-7 h-7 rounded-xl bg-amber-50 border border-amber-200/80 flex items-center justify-center text-sm shadow-2xs">
-              👨‍🍳
+            <div className="w-8 h-8 rounded-xl bg-white border border-stone-200/90 overflow-hidden flex items-center justify-center shadow-2xs p-0.5">
+              <img src="/cad-bakery-logo.png" alt="CAD Bakery Logo" className="w-full h-full object-contain" />
             </div>
             <h1 className="font-bold text-base text-[#1C1C1E]">Create Listing</h1>
           </div>
@@ -151,10 +301,15 @@ export default function CreateListingPage({ onBack, onSave, onNavigateToProfile 
 
               <button
                 type="button"
-                onClick={() => setPhotoUrl('https://images.unsplash.com/photo-1549931319-a545dcf3bc73?auto=format&fit=crop&w=800&q=80')}
-                className="w-9 h-9 rounded-xl bg-white/90 hover:bg-white text-rose-600 flex items-center justify-center shadow-md backdrop-blur-xs"
+                onClick={() => {
+                  const defaultImg = (CATEGORY_PRESETS[selectedCategory] || CATEGORY_PRESETS.bakery)[0].image;
+                  setPhotoUrl(defaultImg);
+                  setPresetToast('Restored default category image');
+                  setTimeout(() => setPresetToast(null), 2500);
+                }}
+                className="px-3 py-2 rounded-xl bg-white/90 hover:bg-white text-stone-700 text-xs font-bold shadow-md backdrop-blur-xs transition-colors flex items-center gap-1 cursor-pointer"
               >
-                <Trash2 className="w-4 h-4" />
+                <span>Keep Default</span>
               </button>
             </div>
           </div>
@@ -243,6 +398,57 @@ export default function CreateListingPage({ onBack, onSave, onNavigateToProfile 
                 {selectedCategory === 'deli' && <Check className="w-2.5 h-2.5 stroke-[3]" />}
               </div>
             </button>
+          </div>
+        </div>
+
+        {/* Quick Food Suggestions for Selected Category with + Button */}
+        <div className="bg-white rounded-3xl border border-stone-200/80 p-4 sm:p-5 shadow-2xs space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-1.5 font-bold text-sm text-[#1C1C1E]">
+              <Sparkles className="w-4 h-4 text-[#2E7D32]" />
+              <span className="capitalize">{selectedCategory} Quick Presets</span>
+            </div>
+            <span className="text-[11px] font-bold text-[#2E7D32] bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+              Click + to autofill
+            </span>
+          </div>
+
+          <p className="text-xs text-stone-500">
+            Tap the <span className="font-bold text-[#2E7D32]">+ button</span> to instantly fill name, description, retail price, and image.
+          </p>
+
+          <div className="space-y-2.5">
+            {(CATEGORY_PRESETS[selectedCategory] || CATEGORY_PRESETS.bakery).map((preset, idx) => (
+              <div
+                key={idx}
+                className="p-3 rounded-2xl bg-stone-50 hover:bg-stone-100/90 border border-stone-200/80 flex items-center justify-between gap-3 transition-all group"
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <img
+                    src={preset.image}
+                    alt={preset.title}
+                    className="w-12 h-12 rounded-xl object-cover shrink-0 border border-stone-200 shadow-2xs"
+                  />
+                  <div className="min-w-0">
+                    <h4 className="font-bold text-xs text-[#1C1C1E] truncate group-hover:text-[#2E7D32] transition-colors">
+                      {preset.title}
+                    </h4>
+                    <p className="text-[11px] text-stone-500 font-semibold mt-0.5">
+                      ${preset.foodSaverPrice} <span className="text-stone-400 line-through text-[10px]">${preset.retailValue}</span>
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => handleApplyPreset(preset)}
+                  className="w-8 h-8 rounded-xl bg-[#2E7D32] hover:bg-[#256629] text-white flex items-center justify-center shrink-0 shadow-xs active:scale-90 transition-all cursor-pointer"
+                  title={`Use "${preset.title}"`}
+                >
+                  <Plus className="w-4 h-4 stroke-[3]" />
+                </button>
+              </div>
+            ))}
           </div>
         </div>
 
@@ -494,10 +700,22 @@ export default function CreateListingPage({ onBack, onSave, onNavigateToProfile 
         <div className="max-w-md sm:max-w-xl mx-auto flex items-center gap-2.5">
           <button
             onClick={handlePublish}
-            className="flex-1 py-3.5 rounded-2xl bg-[#2E7D32] hover:bg-[#256629] text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-sm transition-all active:scale-[0.99] cursor-pointer"
+            disabled={isSubmitting}
+            className={`flex-1 py-3.5 rounded-2xl bg-[#2E7D32] hover:bg-[#256629] text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-sm transition-all active:scale-[0.99] cursor-pointer ${
+              isSubmitting ? 'opacity-70 cursor-not-allowed' : ''
+            }`}
           >
-            <Zap className="w-4 h-4 fill-white" />
-            <span>Publish Listing (${priceNum.toFixed(2)} • {bagsAvailable} bags)</span>
+            {isSubmitting ? (
+              <>
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                <span>Publishing to FoodLink network...</span>
+              </>
+            ) : (
+              <>
+                <Zap className="w-4 h-4 fill-white" />
+                <span>Publish Listing (${priceNum.toFixed(2)} • {bagsAvailable} bags)</span>
+              </>
+            )}
           </button>
 
           <button

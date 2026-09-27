@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Plus,
   Leaf,
@@ -12,8 +12,14 @@ import {
   CheckCircle2,
   Package,
   User,
-  X
+  X,
+  RefreshCw
 } from 'lucide-react';
+import {
+  getMerchantListings,
+  updateMerchantListing,
+  deleteMerchantListing
+} from '../../services/api';
 
 export default function MerchantListings({
   onOpenCreate,
@@ -22,6 +28,7 @@ export default function MerchantListings({
 }) {
   const [activeFilter, setActiveFilter] = useState('active');
   const [toastMessage, setToastMessage] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   const showToast = (msg) => {
     setToastMessage(msg);
@@ -30,89 +37,109 @@ export default function MerchantListings({
     }, 3500);
   };
 
-  // Listings State
-  const [listings, setListings] = useState([
-    {
-      id: 'lst-1',
-      title: 'Artisan Pastry & Sourdough',
-      subtitle: 'Surprise mixed daily selection',
-      image: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=700&q=80',
-      price: '$4.99',
-      originalPrice: '$15.00',
-      status: 'active',
-      liveTag: 'Live • Selling Fast',
-      stockTag: 'Only 2 left',
-      soldCount: 8,
-      remainingCount: 2,
-      totalCount: 10,
-      earned: '$39.92',
-      pickupWindow: '6:30 – 7:30 PM',
-      isPaused: false
-    },
-    {
-      id: 'lst-2',
-      title: 'Croissant & Brioche Bundle',
-      subtitle: 'Sweet pastries & breakfast buns',
-      image: 'https://images.unsplash.com/photo-1555507036-ab1f4038808a?auto=format&fit=crop&w=700&q=80',
-      price: '$3.99',
-      originalPrice: '$12.00',
-      status: 'active',
-      liveTag: 'Live',
-      stockTag: null,
-      soldCount: 6,
-      remainingCount: 2,
-      totalCount: 8,
-      earned: '$23.94',
-      pickupWindow: '7:00 – 8:00 PM',
-      isPaused: false
-    },
-    {
-      id: 'lst-3',
-      title: 'Rustic French Baguette Duo',
-      subtitle: 'Twin crusty baguettes',
-      image: 'https://images.unsplash.com/photo-1549931319-a545dcf3bc73?auto=format&fit=crop&w=700&q=80',
-      price: '$3.49',
-      originalPrice: '$10.00',
-      status: 'sold-out',
-      liveTag: 'Sold Out (10/10)',
-      stockTag: null,
-      soldCount: 10,
-      remainingCount: 0,
-      totalCount: 10,
-      finishedTime: '5:45 PM',
-      earned: '$34.90',
-      isPaused: false
-    }
-  ]);
+  // Helper to normalize DB listing to merchant card shape
+  const normalizeMerchantItem = (item) => {
+    const origPriceNum = typeof item.originalPrice === 'number' ? item.originalPrice : parseFloat(item.originalPrice) || 15.0;
+    const priceNum = typeof item.price === 'number' ? item.price : parseFloat(item.price) || 4.99;
+    const remaining = item.bagsAvailable !== undefined ? item.bagsAvailable : (item.remainingCount || 2);
+    const sold = item.bagsSold !== undefined ? item.bagsSold : (item.soldCount || 4);
+    const total = remaining + sold;
+    const isSoldOut = remaining <= 0 || item.status === 'SOLD_OUT';
 
-  const updateRemaining = (id, delta) => {
+    return {
+      id: item.id,
+      title: item.title,
+      subtitle: item.description ? item.description.slice(0, 40) + '...' : 'Surprise mixed daily selection',
+      image: item.photoUrl || item.image || 'https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=700&q=80',
+      price: `$${priceNum.toFixed(2)}`,
+      originalPrice: `$${origPriceNum.toFixed(2)}`,
+      status: isSoldOut ? 'sold-out' : 'active',
+      liveTag: isSoldOut ? `Sold Out (${sold}/${total})` : (remaining <= 2 ? 'Live • Selling Fast' : 'Live'),
+      stockTag: remaining <= 2 && !isSoldOut ? `Only ${remaining} left` : null,
+      soldCount: sold,
+      remainingCount: remaining,
+      totalCount: total,
+      earned: `$${(sold * priceNum).toFixed(2)}`,
+      pickupWindow: `${item.pickupStart || '6:30'} – ${item.pickupEnd || '7:30 PM'}`,
+      isPaused: item.status === 'PAUSED',
+      raw: item
+    };
+  };
+
+  // Fetch initial listings from database
+  const loadListings = async () => {
+    setIsLoading(true);
+    try {
+      const data = await getMerchantListings();
+      if (Array.isArray(data) && data.length > 0) {
+        setListings(data.map(normalizeMerchantItem));
+      }
+    } catch (err) {
+      console.error('Failed to load merchant listings:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadListings();
+  }, []);
+
+  // Listings State
+  const [listings, setListings] = useState([]);
+
+  const updateRemaining = async (id, delta) => {
+    const current = listings.find((l) => l.id === id);
+    if (!current) return;
+    const nextRemaining = Math.max(0, current.remainingCount + delta);
+
+    // Optimistic UI update
     setListings((prev) =>
       prev.map((item) => {
         if (item.id === id) {
-          const nextRemaining = Math.max(0, item.remainingCount + delta);
-          showToast(`Updated "${item.title}" stock to ${nextRemaining}`);
+          const isSoldOut = nextRemaining === 0;
           return {
             ...item,
             remainingCount: nextRemaining,
-            totalCount: item.soldCount + nextRemaining
+            totalCount: item.soldCount + nextRemaining,
+            status: isSoldOut ? 'sold-out' : 'active',
           };
         }
         return item;
       })
     );
+
+    showToast(`Updated "${current.title}" stock to ${nextRemaining}`);
+
+    // Sync to backend DB
+    try {
+      await updateMerchantListing(id, {
+        bagsAvailable: nextRemaining,
+        status: nextRemaining === 0 ? 'SOLD_OUT' : 'ACTIVE',
+      });
+    } catch (err) {
+      console.error('Failed to sync stock update:', err);
+    }
   };
 
-  const togglePause = (id) => {
+  const togglePause = async (id) => {
+    const current = listings.find((l) => l.id === id);
+    if (!current) return;
+    const nextPaused = !current.isPaused;
+
     setListings((prev) =>
-      prev.map((item) => {
-        if (item.id === id) {
-          const nextPaused = !item.isPaused;
-          showToast(nextPaused ? `Paused "${item.title}"` : `Resumed "${item.title}" on discovery feed`);
-          return { ...item, isPaused: nextPaused };
-        }
-        return item;
-      })
+      prev.map((item) => (item.id === id ? { ...item, isPaused: nextPaused } : item))
     );
+
+    showToast(nextPaused ? `Paused "${current.title}"` : `Resumed "${current.title}" on discovery feed`);
+
+    try {
+      await updateMerchantListing(id, {
+        status: nextPaused ? 'PAUSED' : 'ACTIVE',
+      });
+    } catch (err) {
+      console.error('Failed to pause/resume listing:', err);
+    }
   };
 
   const relistItem = (item) => {
@@ -229,20 +256,21 @@ export default function MerchantListings({
 
       {/* Listings List */}
       <div className="space-y-4">
-        {filteredListings.map((item) => (
+        {filteredListings.map((item, idx) => (
           <div
             key={item.id}
-            className="bg-white rounded-3xl border border-stone-200/80 overflow-hidden shadow-2xs hover:shadow-xs transition-shadow"
+            style={{ animationDelay: `${idx * 80}ms` }}
+            className="bg-white rounded-3xl border border-stone-200/80 overflow-hidden interactive-card group shadow-2xs hover:border-emerald-300/80"
           >
             {/* Banner Image with Overlays */}
             <div className="relative h-44 sm:h-52 w-full overflow-hidden bg-stone-100">
-              <img src={item.image} alt={item.title} className="w-full h-full object-cover" />
+              <img src={item.image} alt={item.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ease-out" />
 
               {/* Status badges */}
               <div className="absolute top-3 left-3 flex items-center gap-1.5">
                 {item.status === 'active' ? (
-                  <span className="px-2.5 py-1 rounded-full bg-[#1b5e20] text-white text-xs font-bold shadow-xs flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                  <span className="px-2.5 py-1 rounded-full bg-[#1b5e20] text-white text-xs font-bold shadow-xs flex items-center gap-1.5 group-hover:scale-105 transition-transform">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
                     <span>{item.liveTag}</span>
                   </span>
                 ) : (
@@ -370,11 +398,18 @@ export default function MerchantListings({
                       </button>
 
                       <button
-                        onClick={() => {
-                          setListings((prev) => prev.filter((l) => l.id !== item.id));
-                          showToast(`Removed "${item.title}"`);
+                        onClick={async () => {
+                          const confirmDelete = window.confirm(`Are you sure you want to remove "${item.title}"?`);
+                          if (!confirmDelete) return;
+                          try {
+                            await deleteMerchantListing(item.id);
+                            setListings((prev) => prev.filter((l) => l.id !== item.id));
+                            showToast(`Removed "${item.title}"`);
+                          } catch (err) {
+                            showToast(`Failed to delete listing: ${err.message}`);
+                          }
                         }}
-                        className="w-8 h-8 rounded-xl bg-stone-50 hover:bg-rose-50 text-stone-400 hover:text-rose-600 border border-stone-200 flex items-center justify-center transition-colors"
+                        className="w-8 h-8 rounded-xl bg-stone-50 hover:bg-rose-50 text-stone-400 hover:text-rose-600 border border-stone-200 flex items-center justify-center transition-colors cursor-pointer"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>

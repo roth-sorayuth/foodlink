@@ -63,7 +63,7 @@ export default function MerchantProfile({ onNavigateToDashboard }) {
   const initialOrders = [
     {
       id: 'FS-8842',
-      store: 'Golden Gate Bakery & Cafe',
+      store: 'CAD Bakery',
       category: 'bakeries',
       status: 'Completed',
       time: 'Today 6:45 PM',
@@ -337,9 +337,9 @@ export default function MerchantProfile({ onNavigateToDashboard }) {
               {/* Profile Image with verified badge */}
               <div className="relative shrink-0">
                 <img 
-                  src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=260&q=80" 
-                  alt="Sarah Jenkins"
-                  className="w-20 h-20 sm:w-24 sm:h-24 rounded-full object-cover ring-4 ring-[#2E7D32]/15 shadow-sm"
+                  src="/cad-bakery-logo.png" 
+                  alt="CAD Bakery Logo"
+                  className="w-20 h-20 sm:w-24 sm:h-24 rounded-full object-contain p-1 bg-white ring-4 ring-[#2E7D32]/20 shadow-sm"
                 />
                 <div className="absolute bottom-0 right-0 w-7 h-7 bg-[#2E7D32] rounded-full flex items-center justify-center text-white ring-2 ring-white shadow-xs">
                   <Check className="w-4 h-4 stroke-[3]" />
@@ -349,23 +349,23 @@ export default function MerchantProfile({ onNavigateToDashboard }) {
               {/* Text Info */}
               <div className="space-y-1.5">
                 <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-                  <h1 className="text-xl sm:text-2xl font-bold text-[#1C1C1E] tracking-tight">Sarah Jenkins</h1>
+                  <h1 className="text-xl sm:text-2xl font-bold text-[#1C1C1E] tracking-tight">CAD Bakery</h1>
                   <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-[#2E7D32]/10 text-[#2E7D32] border border-[#2E7D32]/20">
-                    <Leaf className="w-3 h-3" /> Level 3 Rescuer
+                    <Leaf className="w-3 h-3" /> Artisan Bakery
                   </span>
                   <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-[#FF8A3D]/15 text-[#D96B1C] border border-[#FF8A3D]/30">
-                    <Award className="w-3 h-3" /> Top 5% SF
+                    <Award className="w-3 h-3" /> Verified Partner
                   </span>
                 </div>
 
                 <p className="text-xs sm:text-sm text-stone-600 flex flex-wrap items-center gap-1.5">
                   <span className="inline-flex items-center gap-1 font-medium text-stone-700">
-                    <MapPin className="w-3.5 h-3.5 text-[#2E7D32]" /> Eco Champion
+                    <MapPin className="w-3.5 h-3.5 text-[#2E7D32]" /> 422 St 178, Daun Penh
                   </span>
                   <span>•</span>
-                  <span>Mission District Hub</span>
+                  <span>Handcrafted Daily</span>
                   <span className="hidden sm:inline">|</span>
-                  <span className="text-stone-500">Member since March 2024</span>
+                  <span className="text-stone-500">Established 2023</span>
                 </p>
 
                 <div className="flex flex-wrap items-center gap-3 pt-1 text-xs font-medium text-stone-600">

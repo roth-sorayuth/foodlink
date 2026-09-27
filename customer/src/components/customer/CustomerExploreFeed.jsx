@@ -1,321 +1,453 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Search,
-  SlidersHorizontal,
-  MapPin,
-  Map,
-  List,
-  ChevronRight,
-  ChevronDown,
-  Star,
   Clock,
   Heart,
+  MapPin,
+  Star,
+  ChevronRight,
+  Bell,
   Sparkles,
-  Leaf,
-  ShieldCheck,
-  ShoppingBag
+  ShoppingBag,
+  RefreshCw,
+  ExternalLink,
 } from 'lucide-react';
+import { socket, getActiveListings } from '../../services/api';
 
 export default function CustomerExploreFeed({
   onSelectListing,
   onOpenMap,
   onNavigateToProfile,
-  onNavigateToOrders
+  onNavigateToOrders,
 }) {
-  const [activeCategory, setActiveCategory] = useState('all');
+  const [activeCategory, setActiveCategory] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
-  const [viewMode, setViewMode] = useState('list'); // 'list' | 'map'
-  const [sortBy, setSortBy] = useState('closest');
-  const [favorites, setFavorites] = useState(['gg-bakery']);
+  const [favorites, setFavorites] = useState(['mori-bistro']);
+  const [listings, setListings] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [justAddedIds, setJustAddedIds] = useState(new Set());
+
+  const categories = [
+    { id: 'All', label: 'All' },
+    { id: 'Pastry', label: 'Pastry' },
+    { id: 'Asian', label: 'Asian' },
+    { id: 'Italian', label: 'Italian' },
+    { id: 'Healthy', label: 'Healthy' },
+    { id: 'Food', label: 'Food' },
+    { id: 'Dessert', label: 'Dessert' },
+    { id: 'Drinks', label: 'Drinks' },
+  ];
+
+  // Helper to normalize listings into the UMAMI card shape from the screenshot
+  const normalizeListing = (item) => {
+    const origPriceNum = typeof item.originalPrice === 'number' ? item.originalPrice : parseFloat(item.originalPrice) || 3.60;
+    const priceNum = typeof item.price === 'number' ? item.price : parseFloat(item.price) || 1.80;
+    const remaining = item.bagsAvailable !== undefined ? item.bagsAvailable : (item.remainingCount || 3);
+
+    return {
+      id: item.id,
+      store: item.storeName || item.store?.name || item.store || 'Mori Bistro',
+      storeLogo: item.store?.logoUrl || (item.storeName?.includes('CAD') || item.title?.includes('CAD') ? '/cad-bakery-logo.png' : null) || item.photoUrl || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=120&q=80',
+      title: item.title,
+      description: item.description,
+      image: item.photoUrl || item.image || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=800&q=80',
+      rating: item.store?.rating ? String(item.store.rating) : '4.7',
+      distance: item.store?.distance || '1.7 km',
+      pickupTime: item.pickupStart ? `${item.pickupStart}–${item.pickupEnd}` : '10:00 AM–9:00 PM',
+      address: item.store?.address || '58 Street R8, Daun Penh',
+      price: `$${priceNum.toFixed(2)}`,
+      originalPrice: `$${origPriceNum.toFixed(2)}`,
+      remaining,
+      category: item.category || 'Meals',
+      raw: item,
+    };
+  };
+
+  // Curated demo listings matching the exact screenshot visual references
+  const fallbackListings = [
+    {
+      id: 'mori-bistro',
+      store: 'Mori Bistro',
+      title: 'Japanese Donburi & Bento Surprise Bag',
+      image: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=800&q=80',
+      rating: '4.7',
+      distance: '1.7 km',
+      pickupTime: '10:00 AM–9:00 PM',
+      address: '58 Street R8, Daun Penh',
+      price: '$1.80',
+      originalPrice: '$3.60',
+      remaining: 3,
+      category: 'Meals',
+    },
+    {
+      id: 'aus-bake',
+      store: 'AusBake Pastries',
+      title: 'Baking Pastries in Cambodia Since 2003',
+      image: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=800&q=80',
+      rating: '4.8',
+      distance: '2.1 km',
+      pickupTime: '11:00 AM–8:30 PM',
+      address: '32 St 113, Boeng Keng Kang',
+      price: '$2.50',
+      originalPrice: '$5.00',
+      remaining: 5,
+      category: 'Bakery',
+    },
+    {
+      id: 'gg-bakery',
+      store: 'CAD Bakery',
+      storeLogo: '/cad-bakery-logo.png',
+      title: 'Artisan Sourdough & Croissant Surprise Box',
+      image: 'https://images.unsplash.com/photo-1555507036-ab1f4038808a?auto=format&fit=crop&w=800&q=80',
+      rating: '4.9',
+      distance: '0.4 km',
+      pickupTime: '6:30 PM–7:30 PM',
+      address: '422 St 178, Daun Penh',
+      price: '$4.99',
+      originalPrice: '$16.00',
+      remaining: 4,
+      category: 'Pastry',
+    },
+    {
+      id: 'green-earth',
+      store: 'Green Earth Grocers',
+      title: 'Fresh Organic Produce & Dairy Box',
+      image: 'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=800&q=80',
+      rating: '4.8',
+      distance: '0.8 km',
+      pickupTime: '7:00 PM–8:30 PM',
+      address: '890 Market St, Tuol Kouk',
+      price: '$6.50',
+      originalPrice: '$22.00',
+      remaining: 2,
+      category: 'Groceries',
+    },
+  ];
+
+  // 1. Fetch live listings from backend DB
+  const loadListings = async () => {
+    setIsLoading(true);
+    try {
+      const data = await getActiveListings(activeCategory === 'All' ? 'all' : activeCategory.toLowerCase(), searchQuery);
+      if (Array.isArray(data) && data.length > 0) {
+        const normalized = data.map(normalizeListing);
+        // Combine with fallback to ensure full rich visual layout
+        const combined = [...normalized];
+        fallbackListings.forEach((fb) => {
+          if (!combined.some((c) => c.title === fb.title || c.id === fb.id)) {
+            combined.push(fb);
+          }
+        });
+        setListings(combined);
+      } else {
+        setListings(fallbackListings);
+      }
+    } catch (err) {
+      console.error('Failed to load listings:', err);
+      setListings(fallbackListings);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadListings();
+  }, [activeCategory]);
+
+  // 2. Real-Time Socket.io listener for new listings
+  useEffect(() => {
+    const handleNewListing = (data) => {
+      const item = data?.listing || data;
+      const normalized = normalizeListing(item);
+
+      setListings((prev) => [normalized, ...prev.filter((l) => l.id !== normalized.id)]);
+      setJustAddedIds((prev) => new Set(prev).add(normalized.id));
+
+      setTimeout(() => {
+        setJustAddedIds((prev) => {
+          const next = new Set(prev);
+          next.delete(normalized.id);
+          return next;
+        });
+      }, 10000);
+    };
+
+    socket.on('NEW_LISTING', handleNewListing);
+
+    return () => {
+      socket.off('NEW_LISTING', handleNewListing);
+    };
+  }, []);
 
   const toggleFavorite = (id, e) => {
     e.stopPropagation();
-    setFavorites(prev => 
-      prev.includes(id) ? prev.filter(f => f !== id) : [...prev, id]
+    setFavorites((prev) =>
+      prev.includes(id) ? prev.filter((f) => f !== id) : [...prev, id]
     );
   };
 
-  const categories = [
-    { id: 'all', label: 'All', icon: null },
-    { id: 'baked', label: 'Baked Goods', icon: '🥐' },
-    { id: 'meals', label: 'Meals', icon: '🍱' },
-    { id: 'groceries', label: 'Groceries', icon: '🛒' },
-  ];
-
-  const rescueItems = [
-    {
-      id: 'gg-bakery',
-      store: 'Golden Gate Bakery & Cafe',
-      title: 'Artisan Pastry & Sourdough Surprise Bag',
-      image: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=700&q=80',
-      rating: '4.9',
-      reviewCount: '340+',
-      distance: '0.4 mi',
-      badgeText: 'Only 2 bags left',
-      badgeColor: 'bg-orange-500 text-white',
-      pickupTime: 'Today, 6:30 PM – 7:30 PM',
-      price: '$4.99',
-      originalPrice: '$16.00',
-      discount: '70% OFF',
-      buttonColor: 'bg-[#2E7D32] hover:bg-[#256629]'
-    },
-    {
-      id: 'green-leaf',
-      store: 'Green Leaf Organic Deli',
-      title: 'Fresh Prepared Lunch & Salad Bag',
-      image: 'https://images.unsplash.com/photo-1540420773420-3366772f4999?auto=format&fit=crop&w=700&q=80',
-      rating: '4.8',
-      reviewCount: '190',
-      distance: '0.8 mi',
-      badgeText: '3 bags left',
-      badgeColor: 'bg-orange-500 text-white',
-      pickupTime: 'Today, 7:00 PM – 8:00 PM',
-      price: '$5.49',
-      originalPrice: '$18.00',
-      discount: '69% OFF',
-      buttonColor: 'bg-[#2E7D32] hover:bg-[#256629]'
-    },
-    {
-      id: 'la-petite',
-      store: 'La Petite Patisserie',
-      title: 'French Macarons & Tartlets Bag',
-      image: 'https://images.unsplash.com/photo-1565958011703-44f9829ba187?auto=format&fit=crop&w=700&q=80',
-      rating: '4.9',
-      reviewCount: '512',
-      distance: '1.2 mi',
-      badgeText: '1 bag left!',
-      badgeColor: 'bg-orange-500 text-white',
-      pickupTime: 'Today, 8:00 PM – 8:45 PM',
-      price: '$3.99',
-      originalPrice: '$14.00',
-      discount: '72% OFF',
-      buttonColor: 'bg-[#FF8A3D] hover:bg-[#e07328]'
-    }
-  ];
+  // Filter listings based on search query
+  const filteredListings = listings.filter((item) => {
+    if (!searchQuery) return true;
+    const q = searchQuery.toLowerCase();
+    return item.store.toLowerCase().includes(q) || item.title?.toLowerCase().includes(q) || item.address?.toLowerCase().includes(q);
+  });
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 pb-24 font-sans text-stone-900">
       
-      {/* Top Search Bar with Filter Button */}
-      <div className="flex items-center gap-2">
+      {/* 1. TOP SEARCH BAR + NOTIFICATION BELL */}
+      <div className="flex items-center gap-3 pt-1">
         <div className="relative flex-1">
-          <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-stone-400" />
+          <Search className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-[#2E7D32]" />
           <input
             type="text"
-            placeholder="Search bakeries, cafes, groceries..."
+            placeholder="Search by location, station, store name..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2.5 bg-white border border-stone-200/90 rounded-2xl text-xs sm:text-sm font-medium text-[#1C1C1E] placeholder:text-stone-400 shadow-2xs focus:bg-white focus:ring-1 focus:ring-[#2E7D32] outline-none transition-all"
+            className="w-full pl-11 pr-4 py-3 bg-white border border-stone-200/90 rounded-full text-xs sm:text-sm font-medium text-[#1C1C1E] placeholder:text-stone-400 shadow-xs focus:ring-1 focus:ring-[#2E7D32] outline-none transition-all"
           />
         </div>
 
+        {/* Notification Bell with Alert Dot */}
         <button
-          className="w-10 h-10 rounded-2xl bg-white border border-stone-200/90 flex items-center justify-center text-stone-700 hover:bg-stone-50 shadow-2xs transition-colors shrink-0"
+          onClick={() => {
+            if (onNavigateToOrders) onNavigateToOrders();
+          }}
+          className="relative w-11 h-11 rounded-full bg-white border border-stone-200/90 flex items-center justify-center text-[#2E7D32] hover:bg-[#EAF7ED]/50 transition-colors shadow-xs shrink-0 cursor-pointer"
         >
-          <SlidersHorizontal className="w-4 h-4" />
+          <Bell className="w-5 h-5" />
+          <span className="absolute top-2.5 right-2.5 w-2 h-2 rounded-full bg-[#2E7D32] ring-2 ring-white" />
         </button>
       </div>
 
-      {/* Category Pills */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-1 text-xs font-semibold scrollbar-none">
+      {/* 2. CATEGORY FILTER PILLS */}
+      <div className="flex items-center gap-2 overflow-x-auto pb-1 text-xs font-bold scrollbar-none">
+        {/* Category Pills */}
         {categories.map((cat) => (
           <button
             key={cat.id}
             onClick={() => setActiveCategory(cat.id)}
-            className={`px-4 py-2 rounded-full whitespace-nowrap transition-all flex items-center gap-1.5 cursor-pointer ${
+            className={`px-4 py-2 rounded-full whitespace-nowrap transition-all duration-200 shadow-2xs cursor-pointer active:scale-95 ${
               activeCategory === cat.id
-                ? 'bg-[#1b5e20] text-white shadow-xs'
-                : 'bg-stone-100 hover:bg-stone-200 text-stone-700'
+                ? 'bg-[#2E7D32] text-white shadow-sm shadow-emerald-900/20 scale-102 font-extrabold'
+                : 'bg-white border border-stone-200/80 text-stone-700 hover:bg-emerald-50/50 hover:border-emerald-200 hover:scale-102'
             }`}
           >
-            {cat.icon && <span>{cat.icon}</span>}
-            <span>{cat.label}</span>
+            {cat.label}
           </button>
         ))}
       </div>
 
-      {/* Mini Map Toggle Card (Mission District, SF) */}
-      <div className="relative rounded-3xl overflow-hidden border border-stone-200/90 shadow-2xs bg-stone-100 h-40 sm:h-48 group">
-        {/* Map Illustration Background */}
-        <div 
-          className="absolute inset-0 bg-cover bg-center"
-          style={{
-            backgroundImage: `url('https://images.unsplash.com/photo-1524661135-423995f22d0b?auto=format&fit=crop&w=1200&q=80')`
-          }}
-        />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-white/40" />
-
-        {/* Location Pill Top Left */}
-        <div className="absolute top-3 left-3">
-          <span className="px-3 py-1 rounded-full bg-white/95 backdrop-blur-md text-[11px] font-bold text-stone-800 shadow-xs flex items-center gap-1.5">
-            <MapPin className="w-3 h-3 text-[#2E7D32]" />
-            <span>Mission District, SF</span>
-          </span>
-        </div>
-
-        {/* Floating Price Pins */}
-        <div className="absolute top-8 left-14 animate-bounce">
-          <span className="px-2.5 py-0.5 rounded-full bg-white text-stone-900 text-[10px] font-extrabold shadow-md flex items-center gap-1 border border-stone-200">
-            🥐 $4.99
-          </span>
-        </div>
-
-        <div className="absolute top-12 right-20">
-          <span className="px-2.5 py-0.5 rounded-full bg-white text-stone-900 text-[10px] font-extrabold shadow-md flex items-center gap-1 border border-stone-200">
-            🥗 $5.49
-          </span>
-        </div>
-
-        <div className="absolute bottom-10 right-12">
-          <span className="px-2.5 py-0.5 rounded-full bg-orange-500 text-white text-[10px] font-extrabold shadow-md flex items-center gap-1">
-            🧁 $3.99
-          </span>
-        </div>
-
-        {/* User Green Dot */}
-        <div className="absolute top-16 left-32 w-4 h-4 rounded-full bg-emerald-500 ring-4 ring-white shadow-md animate-pulse" />
-
-        {/* Bottom Map/List Toggle Control */}
-        <div className="absolute bottom-3 right-3">
-          <div className="flex items-center bg-white/95 backdrop-blur-md p-1 rounded-2xl shadow-md border border-stone-200 text-xs font-bold text-stone-700">
-            <button
-              onClick={onOpenMap}
-              className={`px-3 py-1 rounded-xl flex items-center gap-1.5 transition-colors ${
-                viewMode === 'map' ? 'bg-[#1b5e20] text-white' : 'hover:text-stone-900'
-              }`}
-            >
-              <Map className="w-3.5 h-3.5" />
-              <span>Map</span>
-            </button>
-            <button
-              onClick={() => setViewMode('list')}
-              className={`px-3 py-1 rounded-xl flex items-center gap-1.5 transition-colors ${
-                viewMode === 'list' ? 'bg-stone-100 text-stone-900' : 'hover:text-stone-900'
-              }`}
-            >
-              <List className="w-3.5 h-3.5" />
-              <span>List</span>
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Community Impact Banner */}
-      <div 
-        onClick={onNavigateToProfile}
-        className="p-3.5 rounded-2xl bg-[#EAF7ED] border border-emerald-200/80 flex items-center justify-between text-xs font-medium text-stone-800 cursor-pointer hover:bg-emerald-100/70 transition-colors shadow-2xs"
-      >
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-full bg-[#1b5e20] text-white flex items-center justify-center shrink-0">
-            <Leaf className="w-4 h-4 fill-white/20" />
-          </div>
-          <div>
-            <span className="font-extrabold text-[#1C1C1E] block">14,230 meals saved in SF</span>
-            <span className="text-[11px] text-stone-600">42.8 tons CO₂ prevented this month</span>
-          </div>
-        </div>
-
-        <ChevronRight className="w-4 h-4 text-stone-400" />
-      </div>
-
-      {/* Rescues Nearby Header */}
-      <div className="flex items-center justify-between pt-1">
-        <div className="flex items-center gap-2">
-          <h2 className="text-base sm:text-lg font-extrabold text-[#1C1C1E]">Rescues Nearby</h2>
-          <span className="text-xs font-semibold text-stone-500">18 available</span>
-        </div>
-
-        <button className="flex items-center gap-1 text-xs font-bold text-stone-600 hover:text-stone-900">
-          <span>Closest</span>
-          <ChevronDown className="w-3.5 h-3.5 text-stone-400" />
-        </button>
-      </div>
-
-      {/* Rescue Deal Cards (Responsive: 1 col on mobile, 2 on tablet, 3 on desktop) */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {rescueItems.map((item) => (
-          <div
-            key={item.id}
-            onClick={() => onSelectListing(item)}
-            className="bg-white rounded-3xl border border-stone-200/80 overflow-hidden shadow-2xs hover:shadow-md transition-all cursor-pointer flex flex-col group"
+      {/* 4. SECTION: "New on FoodLink" (Horizontal Carousel) */}
+      <div className="space-y-3 pt-2">
+        <div className="flex items-center justify-between px-1">
+          <h2 className="text-lg sm:text-xl font-black text-[#1C1C1E] tracking-tight">
+            New on FoodLink
+          </h2>
+          <button 
+            onClick={() => setActiveCategory('All')}
+            className="text-xs font-extrabold text-[#2E7D32] hover:text-[#256629] flex items-center gap-0.5 cursor-pointer hover:underline"
           >
-            {/* Image Container with Badges */}
-            <div className="relative h-48 w-full overflow-hidden bg-stone-100">
-              <img
-                src={item.image}
-                alt={item.store}
-                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-              />
+            <span>See All</span>
+            <ChevronRight className="w-3.5 h-3.5" />
+          </button>
+        </div>
 
-              {/* Urgency Badge */}
-              <div className="absolute top-3 right-3">
-                <span className={`px-2.5 py-1 rounded-full text-xs font-bold shadow-xs ${item.badgeColor}`}>
-                  {item.badgeText}
-                </span>
-              </div>
-
-              {/* Heart Favorite Button */}
-              <button
-                onClick={(e) => toggleFavorite(item.id, e)}
-                className="absolute top-3 left-3 w-8 h-8 rounded-full bg-white/90 backdrop-blur-xs flex items-center justify-center shadow-xs text-stone-600 hover:text-rose-500 transition-colors"
+        {/* Horizontal Card Carousel */}
+        <div className="flex gap-4 overflow-x-auto pb-4 pt-1 scrollbar-none -mx-3.5 px-3.5 sm:mx-0 sm:px-0">
+          {filteredListings.slice(0, 4).map((item, idx) => {
+            const isJustAdded = justAddedIds.has(item.id);
+            return (
+              <div
+                key={item.id}
+                onClick={() => onSelectListing(item)}
+                style={{ animationDelay: `${idx * 80}ms` }}
+                className={`w-[290px] sm:w-[320px] shrink-0 bg-white rounded-3xl overflow-hidden border food-card shadow-xs cursor-pointer flex flex-col group relative ${
+                  isJustAdded ? 'border-[#2E7D32] ring-2 ring-[#2E7D32]/30' : 'border-stone-200/80 hover:border-emerald-500/50'
+                }`}
               >
-                <Heart className={`w-4 h-4 ${favorites.includes(item.id) ? 'fill-rose-500 text-rose-500' : ''}`} />
-              </button>
+                {/* Hero Image Container */}
+                <div className="relative h-44 w-full bg-stone-100 overflow-hidden">
+                  <img
+                    src={item.image}
+                    alt={item.store}
+                    className="w-full h-full object-cover group-hover:scale-108 transition-transform duration-700 ease-out"
+                  />
 
-              {/* Rating & Distance Badges */}
-              <div className="absolute bottom-3 left-3 flex items-center gap-1.5">
-                <span className="px-2.5 py-1 rounded-full bg-white/95 backdrop-blur-xs text-xs font-bold text-stone-900 shadow-xs flex items-center gap-1">
-                  <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
-                  <span>{item.rating}</span>
-                  <span className="text-stone-400 font-normal">({item.reviewCount})</span>
-                </span>
+                  {/* Dark Discount Price Badge (strikethrough + bold price) */}
+                  <div className="absolute bottom-2.5 right-2.5 bg-black/80 backdrop-blur-md px-3 py-1 rounded-xl text-white flex items-center gap-1.5 shadow-md group-hover:scale-105 transition-transform duration-300">
+                    <span className="text-[11px] text-stone-300 line-through font-normal">{item.originalPrice}</span>
+                    <span className="text-base font-black text-white">{item.price}</span>
+                  </div>
 
-                <span className="px-2.5 py-1 rounded-full bg-white/95 backdrop-blur-xs text-xs font-bold text-stone-700 shadow-xs flex items-center gap-1">
-                  <MapPin className="w-3 h-3 text-[#2E7D32]" />
-                  <span>{item.distance}</span>
-                </span>
-              </div>
-            </div>
-
-            {/* Content Details */}
-            <div className="p-4 sm:p-5 flex-1 flex flex-col justify-between space-y-3">
-              <div>
-                <h3 className="font-bold text-base text-[#1C1C1E]">{item.store}</h3>
-                <p className="text-xs text-stone-500 mt-0.5">{item.title}</p>
-                
-                <div className="flex items-center gap-1.5 text-xs text-stone-500 font-medium mt-2">
-                  <Clock className="w-3.5 h-3.5 text-stone-400" />
-                  <span>{item.pickupTime}</span>
-                </div>
-              </div>
-
-              {/* Price & Reserve Button */}
-              <div className="flex items-center justify-between pt-2 border-t border-stone-100">
-                <div className="flex items-baseline gap-1.5">
-                  <span className="font-black text-lg text-[#1C1C1E]">{item.price}</span>
-                  <span className="text-xs text-stone-400 line-through">{item.originalPrice}</span>
-                  <span className="text-[11px] font-bold text-[#2E7D32] bg-emerald-50 px-1.5 py-0.5 rounded">
-                    {item.discount}
-                  </span>
+                  {/* Overhanging Store Logo Avatar on bottom left */}
+                  <div className="absolute -bottom-3 left-4 w-12 h-12 rounded-full overflow-hidden bg-white border-2 border-white shadow-md flex items-center justify-center group-hover:scale-110 group-hover:rotate-3 transition-transform duration-300">
+                    <img
+                      src={item.storeLogo || item.image}
+                      alt={item.store}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
                 </div>
 
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onSelectListing(item);
-                  }}
-                  className={`px-4 py-2 rounded-xl text-white text-xs font-bold shadow-xs transition-transform active:scale-95 ${item.buttonColor}`}
-                >
-                  Reserve
-                </button>
+                {/* Card Content Details */}
+                <div className="p-4 pt-5 flex-1 flex flex-col justify-between space-y-2.5">
+                  <div className="flex items-start justify-between gap-2">
+                    <h3 className="font-extrabold text-base text-stone-900 truncate group-hover:text-[#2E7D32] transition-colors duration-200">
+                      {item.store}
+                    </h3>
+                    <div className="flex items-center gap-1 text-xs font-black text-[#FF8A3D] shrink-0 group-hover:scale-105 transition-transform">
+                      <span>★</span>
+                      <span>{item.rating}</span>
+                    </div>
+                  </div>
+
+                  {/* Pickup Hours & Distance */}
+                  <div className="flex items-center justify-between text-xs text-stone-600 font-medium">
+                    <div className="flex items-center gap-1.5">
+                      <Clock className="w-3.5 h-3.5 text-stone-400 group-hover:text-[#2E7D32] transition-colors" />
+                      <span>Pick up: {item.pickupTime}</span>
+                    </div>
+                    <span className="text-stone-500 font-semibold">{item.distance}</span>
+                  </div>
+
+                  {/* Location & Heart Favorite Action */}
+                  <div className="flex items-center justify-between pt-1 border-t border-stone-100">
+                    <div className="flex items-center gap-1 text-xs text-stone-500 truncate max-w-[200px]">
+                      <MapPin className="w-3.5 h-3.5 text-[#2E7D32] shrink-0" />
+                      <span className="truncate">{item.address}</span>
+                    </div>
+
+                    <button
+                      onClick={(e) => toggleFavorite(item.id, e)}
+                      className="p-1.5 text-stone-400 hover:text-rose-500 active:scale-125 transition-all duration-200 cursor-pointer"
+                    >
+                      <Heart
+                        className={`w-4 h-4 transition-all duration-200 ${
+                          favorites.includes(item.id) ? 'fill-rose-500 text-rose-500 scale-110 heart-pop' : 'hover:scale-115'
+                        }`}
+                      />
+                    </button>
+                  </div>
+                </div>
               </div>
-
-            </div>
-
-          </div>
-        ))}
+            );
+          })}
+        </div>
       </div>
 
+      {/* 5. SECTION: "All bags near you" */}
+      <div className="space-y-3 pt-4">
+        <div className="flex items-center justify-between px-1">
+          <h2 className="text-lg sm:text-xl font-black text-[#1C1C1E] tracking-tight">
+            All bags near you
+          </h2>
+          <span className="text-xs font-bold text-stone-500">
+            {filteredListings.length} surplus bags ready
+          </span>
+        </div>
+
+        {/* Vertical Feed Cards */}
+        {isLoading ? (
+          <div className="py-12 text-center space-y-2">
+            <div className="w-8 h-8 border-3 border-[#2E7D32] border-t-transparent rounded-full animate-spin mx-auto" />
+            <p className="text-xs font-bold text-stone-500">Loading nearby surplus bags...</p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {filteredListings.map((item, idx) => (
+              <div
+                key={item.id}
+                onClick={() => onSelectListing(item)}
+                style={{ animationDelay: `${Math.min(idx, 6) * 60}ms` }}
+                className="bg-white rounded-3xl overflow-hidden border border-stone-200/80 food-card shadow-xs cursor-pointer flex flex-col group relative"
+              >
+                {/* Hero Image Banner */}
+                <div className="relative h-48 sm:h-56 w-full bg-stone-100 overflow-hidden">
+                  <img
+                    src={item.image}
+                    alt={item.store}
+                    className="w-full h-full object-cover group-hover:scale-106 transition-transform duration-700 ease-out"
+                  />
+
+                  {/* Dark Discount Price Badge */}
+                  <div className="absolute bottom-3 right-3 bg-black/80 backdrop-blur-md px-3.5 py-1.5 rounded-xl text-white flex items-center gap-1.5 shadow-md group-hover:scale-105 transition-transform duration-300">
+                    <span className="text-xs text-stone-300 line-through font-normal">{item.originalPrice}</span>
+                    <span className="text-lg font-black text-white">{item.price}</span>
+                  </div>
+
+                  {/* Overhanging Store Logo Avatar on bottom left */}
+                  <div className="absolute -bottom-3 left-4 w-12 h-12 rounded-full overflow-hidden bg-white border-2 border-white shadow-md flex items-center justify-center group-hover:scale-110 group-hover:rotate-3 transition-transform duration-300">
+                    <img
+                      src={item.storeLogo || item.image}
+                      alt={item.store}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                </div>
+
+                {/* Card Content Details */}
+                <div className="p-4 sm:p-5 pt-5 space-y-2.5">
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <h3 className="font-extrabold text-base sm:text-lg text-stone-900 group-hover:text-[#2E7D32] transition-colors duration-200">
+                        {item.store}
+                      </h3>
+                      <p className="text-xs text-stone-500 font-medium mt-0.5">{item.title}</p>
+                    </div>
+
+                    <div className="flex items-center gap-1 text-xs font-black text-[#FF8A3D] shrink-0 group-hover:scale-105 transition-transform">
+                      <span>★</span>
+                      <span>{item.rating}</span>
+                    </div>
+                  </div>
+
+                  {/* Pickup Hours & Distance */}
+                  <div className="flex items-center justify-between text-xs text-stone-600 font-medium">
+                    <div className="flex items-center gap-1.5">
+                      <Clock className="w-3.5 h-3.5 text-stone-400 group-hover:text-[#2E7D32] transition-colors" />
+                      <span>Pick up: {item.pickupTime}</span>
+                    </div>
+                    <span className="text-stone-500 font-semibold">{item.distance}</span>
+                  </div>
+
+                  {/* Address & Actions */}
+                  <div className="flex items-center justify-between pt-2 border-t border-stone-100">
+                    <div className="flex items-center gap-1 text-xs text-stone-500 truncate max-w-[240px]">
+                      <MapPin className="w-3.5 h-3.5 text-[#2E7D32] shrink-0" />
+                      <span className="truncate">{item.address}</span>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={(e) => toggleFavorite(item.id, e)}
+                        className="p-1.5 text-stone-400 hover:text-rose-500 active:scale-125 transition-all duration-200 cursor-pointer"
+                      >
+                        <Heart
+                          className={`w-4 h-4 transition-all duration-200 ${
+                            favorites.includes(item.id) ? 'fill-rose-500 text-rose-500 scale-110 heart-pop' : 'hover:scale-115'
+                          }`}
+                        />
+                      </button>
+
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onSelectListing(item);
+                        }}
+                        className="px-4 py-1.5 rounded-full bg-[#2E7D32] hover:bg-[#256629] text-white text-xs font-bold shadow-xs hover:shadow-md hover:shadow-emerald-900/20 active:scale-95 hover:scale-105 transition-all duration-200 cursor-pointer"
+                      >
+                        Reserve
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

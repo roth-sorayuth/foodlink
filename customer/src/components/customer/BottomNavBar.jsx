@@ -3,7 +3,6 @@ import {
   Home, 
   Compass, 
   ShoppingBag, 
-  Heart, 
   User 
 } from 'lucide-react';
 
@@ -12,7 +11,6 @@ export default function BottomNavBar({ activeTab, onSelectTab, ordersBadgeCount 
     { id: 'home', label: 'Home', icon: Home },
     { id: 'explore', label: 'Explore', icon: Compass },
     { id: 'orders', label: 'Orders', icon: ShoppingBag, badge: ordersBadgeCount },
-    { id: 'favorites', label: 'Favorites', icon: Heart },
     { id: 'profile', label: 'Profile', icon: User },
   ];
 

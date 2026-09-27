@@ -16,10 +16,12 @@ import MerchantOrders from './pages/Orders/MerchantOrders';
 import VerifyPickupPage from './pages/Orders/VerifyPickupPage';
 import MerchantAnalytics from './pages/Analytics/MerchantAnalytics';
 import MerchantProfile from './pages/StoreProfile/MerchantProfile';
+import OrderNotificationMenu from './components/common/OrderNotificationMenu';
 
 export default function AdminApp() {
   const [activeTab, setActiveTab] = useState('dashboard'); // 'dashboard' | 'listings' | 'orders' | 'insights' | 'profile'
   const [subView, setSubView] = useState(null); // 'create-listing' | 'verify-pickup'
+  const [verificationCode, setVerificationCode] = useState(null);
   const [isOpen, setIsOpen] = useState(true);
   const [toastMessage, setToastMessage] = useState(null);
 
@@ -55,8 +57,8 @@ export default function AdminApp() {
         {/* Quick Top Switcher Bar */}
         <div className="bg-[#1C1C1E] text-white px-4 py-2 text-xs flex items-center justify-between sticky top-0 z-50">
           <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            <span className="font-bold">Golden Gate Bakery</span>
+            <img src="/cad-bakery-logo.png" alt="CAD Bakery Logo" className="w-5 h-5 rounded-full object-contain bg-white p-0.5" />
+            <span className="font-bold">CAD Bakery</span>
             <span className="text-stone-400 hidden sm:inline">— Store Profile & Environmental Impact</span>
           </div>
           <button
@@ -95,48 +97,41 @@ export default function AdminApp() {
           
           {/* Store Logo & Name */}
           <div className="flex items-center gap-2.5">
-            <div className="w-10 h-10 rounded-2xl bg-amber-50 border border-amber-200/80 flex items-center justify-center text-xl shadow-2xs">
-              👨‍🍳
+            <div className="w-11 h-11 rounded-2xl bg-white border border-stone-200/90 overflow-hidden flex items-center justify-center shadow-2xs shrink-0 p-1">
+              <img
+                src="/cad-bakery-logo.png"
+                alt="CAD Bakery Logo"
+                className="w-full h-full object-contain"
+              />
             </div>
             <div>
               <div 
                 onClick={() => setActiveTab('dashboard')}
                 className="flex items-center gap-1.5 cursor-pointer hover:opacity-85 transition-opacity"
               >
-                <h1 className="font-bold text-base text-[#1C1C1E] tracking-tight">Golden Gate Bakery</h1>
+                <h1 className="font-bold text-base text-[#1C1C1E] tracking-tight">CAD Bakery</h1>
                 <div className="flex flex-col text-stone-400 text-[9px] -space-y-1">
                   <span>▲</span>
                   <span>▼</span>
                 </div>
               </div>
-              <p className="text-[11px] font-semibold text-[#2E7D32]">Partner Merchant</p>
+              <p className="text-[11px] font-semibold text-[#2E7D32]">Artisan Bakery • Partner</p>
             </div>
           </div>
 
-          {/* Right Controls: Open Pill & Profile Button */}
+          {/* Right Controls: Order Notifications Center */}
           <div className="flex items-center gap-2">
-            <button
-              onClick={() => {
-                setIsOpen(!isOpen);
-                showToast(isOpen ? 'Store marked as Closed' : 'Store marked as Open for pickup');
+            <OrderNotificationMenu
+              onNavigateToOrders={() => {
+                setSubView(null);
+                setActiveTab('orders');
               }}
-              className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer ${
-                isOpen
-                  ? 'bg-emerald-100/80 text-[#2E7D32] border border-emerald-300/60'
-                  : 'bg-stone-200 text-stone-600 border border-stone-300'
-              }`}
-            >
-              <span className={`w-2 h-2 rounded-full ${isOpen ? 'bg-[#2E7D32]' : 'bg-stone-400'}`} />
-              <span>{isOpen ? 'Open' : 'Closed'}</span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab('profile')}
-              title="View Store / Merchant Profile"
-              className="w-9 h-9 rounded-full bg-[#1b5e20] hover:bg-[#144919] text-white flex items-center justify-center transition-transform active:scale-95 shadow-xs cursor-pointer"
-            >
-              <User className="w-4 h-4" />
-            </button>
+              onOpenVerify={(code) => {
+                setVerificationCode(code);
+                setSubView('verify-pickup');
+              }}
+              showToast={showToast}
+            />
           </div>
         </div>
       </header>
@@ -147,9 +142,14 @@ export default function AdminApp() {
         {/* SubView: Verify Pickup */}
         {subView === 'verify-pickup' ? (
           <VerifyPickupPage
-            onBack={() => setSubView(null)}
+            initialCode={verificationCode}
+            onBack={() => {
+              setSubView(null);
+              setVerificationCode(null);
+            }}
             onCompleteHandover={(data) => {
               setSubView(null);
+              setVerificationCode(null);
               showToast(`Handover completed for ${data.customerName}!`);
             }}
           />

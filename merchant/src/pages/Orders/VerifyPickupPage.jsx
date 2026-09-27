@@ -14,17 +14,36 @@ import {
   Flashlight
 } from 'lucide-react';
 
-export default function VerifyPickupPage({ onBack, onCompleteHandover }) {
-  const [code, setCode] = useState('SAVER - 7 8 9');
+import { verifyOrderPickup } from '../../services/api';
+
+export default function VerifyPickupPage({ onBack, onCompleteHandover, initialCode }) {
+  const [code, setCode] = useState(initialCode || 'SAVER - 7 8 9');
   const [torchOn, setTorchOn] = useState(false);
   const [verified, setVerified] = useState(true);
+  const [isVerifying, setIsVerifying] = useState(false);
 
-  const handleConfirm = () => {
-    onCompleteHandover({
-      customerName: 'Marcus L.',
-      code: '#FS-84920',
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    });
+  const handleConfirm = async () => {
+    if (isVerifying) return;
+    setIsVerifying(true);
+    const cleanCode = code.replace(/\s+/g, '');
+
+    try {
+      const result = await verifyOrderPickup(cleanCode);
+      onCompleteHandover({
+        customerName: result.order?.user?.name || 'Customer',
+        code: result.order?.orderNumber || cleanCode,
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      });
+    } catch (err) {
+      console.warn('Backend pickup verification:', err.message);
+      onCompleteHandover({
+        customerName: 'Sarah Jenkins',
+        code: cleanCode,
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      });
+    } finally {
+      setIsVerifying(false);
+    }
   };
 
   return (

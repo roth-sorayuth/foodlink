@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Store,
   ChevronDown,
@@ -20,22 +20,30 @@ import {
   BarChart3,
   Check,
   Search,
-  AlertCircle
+  AlertCircle,
+  Sparkles,
+  ShoppingBag,
+  Bell
 } from 'lucide-react';
+import { getMerchantListings, verifyOrderPickup } from '../../services/api';
+import { socket } from '../../services/socket';
 
-export default function MerchantDashboard({ onNavigateToProfile }) {
+export default function MerchantDashboard({ onNavigateToProfile, onOpenCreate, onOpenVerify }) {
   // Store Operational State
   const [isOpen, setIsOpen] = useState(true);
   const [acceptingRescues, setAcceptingRescues] = useState(true);
-  const [showAlertBanner, setShowAlertBanner] = useState(true);
   const [activeBottomTab, setActiveBottomTab] = useState('dashboard');
   
+  // Real-time Order Alert State
+  const [newOrderAlert, setNewOrderAlert] = useState(null);
+
   // Modals & Feedback
   const [toastMessage, setToastMessage] = useState(null);
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [scanModalOpen, setScanModalOpen] = useState(false);
   const [claimCodeInput, setClaimCodeInput] = useState('');
   const [editModalItem, setEditModalItem] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   const showToast = (msg) => {
     setToastMessage(msg);
@@ -44,41 +52,76 @@ export default function MerchantDashboard({ onNavigateToProfile }) {
     }, 3500);
   };
 
-  // Listings State
-  const [listings, setListings] = useState([
-    {
-      id: 'lst-1',
-      title: 'Artisan Pastry & Sourdough Surprise Bag',
-      description: "Assortment of today's crusty boules, daily brioche, and sweet morning pastries.",
-      image: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=700&q=80',
-      status: 'Active',
-      tagText: '2 left!',
-      tagColor: 'bg-amber-500 text-white',
-      pickupWindow: 'Pickup 6:30 PM - 7:30 PM',
-      price: '$4.99',
-      originalValue: '$16.00 value',
-      soldCount: 8,
-      totalCount: 10,
-      claimedPercent: 80,
-      progressColor: 'bg-amber-500'
-    },
-    {
-      id: 'lst-2',
-      title: 'Assorted Croissant & Brioche Bundle',
-      description: 'Classic French croissants, almond pain au chocolat, and custard brioche buns.',
-      image: 'https://images.unsplash.com/photo-1555507036-ab1f4038808a?auto=format&fit=crop&w=700&q=80',
-      status: 'Active',
-      tagText: '2 left',
-      tagColor: 'bg-stone-800 text-white',
-      pickupWindow: 'Pickup 7:00 PM - 8:00 PM',
-      price: '$3.99',
-      originalValue: '$14.00 value',
-      soldCount: 6,
-      totalCount: 8,
-      claimedPercent: 75,
-      progressColor: 'bg-[#2E7D32]'
+  // Helper to normalize DB listing to dashboard card shape
+  const normalizeDashboardItem = (item) => {
+    const origPriceNum = typeof item.originalPrice === 'number' ? item.originalPrice : parseFloat(item.originalPrice) || 16.0;
+    const priceNum = typeof item.price === 'number' ? item.price : parseFloat(item.price) || 4.99;
+    const remaining = item.bagsAvailable !== undefined ? item.bagsAvailable : (item.remainingCount || 2);
+    const sold = item.bagsSold !== undefined ? item.bagsSold : (item.soldCount || 4);
+    const total = remaining + sold;
+    const claimedPercent = total > 0 ? Math.round((sold / total) * 100) : 0;
+
+    return {
+      id: item.id,
+      title: item.title,
+      description: item.description || "Assortment of today's fresh surplus food items.",
+      image: item.photoUrl || item.image || 'https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=700&q=80',
+      status: item.status === 'ACTIVE' || item.status === 'Active' ? 'Active' : 'Sold Out',
+      tagText: remaining <= 2 ? `${remaining} left!` : `${remaining} left`,
+      tagColor: remaining <= 2 ? 'bg-amber-500 text-white' : 'bg-stone-800 text-white',
+      pickupWindow: `Pickup ${item.pickupStart || '6:30 PM'} - ${item.pickupEnd || '7:30 PM'}`,
+      price: `$${priceNum.toFixed(2)}`,
+      originalValue: `$${origPriceNum.toFixed(2)} value`,
+      soldCount: sold,
+      totalCount: total,
+      claimedPercent,
+      progressColor: claimedPercent >= 75 ? 'bg-amber-500' : 'bg-[#2E7D32]',
+    };
+  };
+
+  // Fetch initial listings from database
+  const loadDashboardListings = async () => {
+    setIsLoading(true);
+    try {
+      const data = await getMerchantListings();
+      if (Array.isArray(data) && data.length > 0) {
+        setListings(data.map(normalizeDashboardItem));
+      }
+    } catch (err) {
+      console.error('Failed to load dashboard listings:', err);
+    } finally {
+      setIsLoading(false);
     }
-  ]);
+  };
+
+  useEffect(() => {
+    loadDashboardListings();
+  }, []);
+
+  // Real-time listener for incoming orders & newly created listings
+  useEffect(() => {
+    const handleOrderCreated = (data) => {
+      const order = data?.order || data;
+      setNewOrderAlert(order);
+      showToast(`🔔 New Order! ${order.user?.name || 'Customer'} ordered "${order.listing?.title || 'Surplus Item'}" (${order.pickupCode || ''})`);
+    };
+
+    const handleNewListing = (data) => {
+      const item = data?.listing || data;
+      setListings((prev) => [normalizeDashboardItem(item), ...prev.filter((l) => l.id !== item.id)]);
+    };
+
+    socket.on('ORDER_CREATED', handleOrderCreated);
+    socket.on('NEW_LISTING', handleNewListing);
+
+    return () => {
+      socket.off('ORDER_CREATED', handleOrderCreated);
+      socket.off('NEW_LISTING', handleNewListing);
+    };
+  }, []);
+
+  // Listings State
+  const [listings, setListings] = useState([]);
 
   // Reservations State
   const [reservations, setReservations] = useState([
@@ -141,19 +184,19 @@ export default function MerchantDashboard({ onNavigateToProfile }) {
     showToast(`Created new surplus listing: "${newBag.title}"!`);
   };
 
-  const handleScanClaim = (e) => {
+  const handleScanClaim = async (e) => {
     e.preventDefault();
     if (!claimCodeInput.trim()) return;
 
     const code = claimCodeInput.trim().toUpperCase();
-    const found = reservations.find(r => r.code.toUpperCase().includes(code) || code.includes(r.code.replace('#', '')));
-
-    if (found) {
-      showToast(`Verified pickup for ${found.customerName} (${found.code})!`);
+    try {
+      const result = await verifyOrderPickup(code);
+      showToast(`Verified pickup: ${result.order?.orderNumber || code} (${result.order?.user?.name || 'Customer'})!`);
       setScanModalOpen(false);
       setClaimCodeInput('');
-    } else {
-      showToast(`Code "${code}" verified as valid Foodlink pickup claim.`);
+      setNewOrderAlert(null);
+    } catch (err) {
+      showToast(`Verification result: ${err.message}`);
       setScanModalOpen(false);
       setClaimCodeInput('');
     }
@@ -161,22 +204,65 @@ export default function MerchantDashboard({ onNavigateToProfile }) {
 
   return (
     <div className="space-y-3.5">
-
-
-        {/* ======================================================== */}
-        {/* 2. ACCEPTING RESCUES TODAY CARD                         */}
-        {/* ======================================================== */}
-        <div className="bg-white rounded-2xl border border-stone-200/80 p-3.5 sm:p-4 flex items-center justify-between shadow-2xs">
+      {/* Real-time Incoming Order Alert Banner */}
+      {newOrderAlert && (
+        <div className="bg-[#EAF7ED] border-2 border-emerald-500 rounded-2xl p-4 flex items-start sm:items-center justify-between gap-3 shadow-md animate-in fade-in slide-in-from-top-2">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-emerald-100/90 text-[#2E7D32] flex items-center justify-center text-lg shrink-0">
-              🏬
+            <div className="w-10 h-10 rounded-xl bg-[#2E7D32] text-white flex items-center justify-center shrink-0">
+              <Bell className="w-5 h-5 animate-bounce" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="font-extrabold text-sm text-[#1C1C1E]">
+                  New Customer Order Placed!
+                </span>
+                <span className="px-2 py-0.5 rounded-full bg-emerald-200 text-emerald-900 text-[10px] font-black">
+                  LIVE
+                </span>
+              </div>
+              <p className="text-xs text-stone-600 mt-0.5">
+                <span className="font-bold text-stone-900">{newOrderAlert.user?.name || 'Customer'}</span> reserved 1x{' '}
+                <span className="font-semibold text-stone-800">{newOrderAlert.listing?.title || 'Surplus Item'}</span> • Pickup Code:{' '}
+                <span className="font-mono font-black text-[#2E7D32] bg-white px-1.5 py-0.5 rounded border border-emerald-300">
+                  {newOrderAlert.pickupCode}
+                </span>
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={() => {
+                if (onOpenVerify) onOpenVerify();
+              }}
+              className="px-3 py-1.5 rounded-xl bg-[#2E7D32] hover:bg-[#256629] text-white text-xs font-bold shadow-xs cursor-pointer"
+            >
+              Confirm Now
+            </button>
+            <button
+              onClick={() => setNewOrderAlert(null)}
+              className="text-stone-400 hover:text-stone-600 p-1 cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ======================================================== */}
+      {/* 2. ACCEPTING RESCUES TODAY CARD                         */}
+      {/* ======================================================== */}
+      <div className="bg-white rounded-2xl border border-stone-200/80 p-3.5 sm:p-4 flex items-center justify-between shadow-2xs">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-white border border-stone-200/90 overflow-hidden flex items-center justify-center shrink-0 p-0.5 shadow-2xs">
+              <img src="/cad-bakery-logo.png" alt="CAD Bakery Logo" className="w-full h-full object-contain" />
             </div>
             <div>
               <div className="flex items-center gap-1.5">
-                <h3 className="font-bold text-sm text-[#1C1C1E]">Accepting Rescues Today</h3>
-                <span className="w-2 h-2 rounded-full bg-stone-300" />
+                <h3 className="font-bold text-sm text-[#1C1C1E]">CAD Bakery • Accepting Rescues</h3>
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
               </div>
-              <p className="text-xs text-stone-500">Live on FoodSaver discovery feed</p>
+              <p className="text-xs text-stone-500">Live on FoodLink customer discovery feed</p>
             </div>
           </div>
 
@@ -200,53 +286,6 @@ export default function MerchantDashboard({ onNavigateToProfile }) {
         </div>
 
         {/* ======================================================== */}
-        {/* 3. URGENT PICKUP ALERT BANNER (Dismissable)             */}
-        {/* ======================================================== */}
-        {showAlertBanner && (
-          <div className="bg-[#FFEFE7] border border-orange-200/80 rounded-2xl p-3.5 sm:p-4 flex items-start sm:items-center justify-between gap-3 shadow-2xs animate-in fade-in">
-            <div className="flex items-start sm:items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-[#FF8A3D] text-white flex items-center justify-center shrink-0 shadow-xs">
-                <Clock className="w-5 h-5" />
-              </div>
-              <div className="space-y-0.5">
-                <div className="flex flex-wrap items-center gap-1.5">
-                  <span className="font-bold text-xs sm:text-sm text-[#8C3A00]">Pickup starts in 45m</span>
-                  <span className="px-2 py-0.5 rounded-md bg-[#8C3A00] text-white text-[10px] font-bold uppercase tracking-wider">
-                    Window Prep
-                  </span>
-                </div>
-                <p className="text-xs text-[#8C3A00]/80">First window begins at 6:30 PM. 14 bags packed.</p>
-              </div>
-            </div>
-
-            <button
-              onClick={() => setShowAlertBanner(false)}
-              className="w-7 h-7 rounded-full hover:bg-orange-200/60 flex items-center justify-center text-[#8C3A00] shrink-0 transition-colors"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-        )}
-
-        {/* ======================================================== */}
-        {/* 4. ECO VICTORY TODAY BANNER                             */}
-        {/* ======================================================== */}
-        <div className="bg-gradient-to-r from-[#1b5e20] to-[#2E7D32] rounded-2xl p-3.5 sm:p-4 text-white flex items-center justify-between shadow-xs">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-full bg-white/20 backdrop-blur-xs flex items-center justify-center text-white shrink-0">
-              <Leaf className="w-4 h-4" />
-            </div>
-            <div>
-              <h3 className="font-bold text-sm text-white">Eco Victory Today</h3>
-              <p className="text-xs text-white/85">35 kg CO₂ saved • 14 fresh meals diverted</p>
-            </div>
-          </div>
-          <span className="px-2.5 py-1 rounded-full bg-white/20 text-[11px] font-bold text-white tracking-wide shrink-0">
-            Top 5%
-          </span>
-        </div>
-
-        {/* ======================================================== */}
         {/* 5. DAILY HIGHLIGHTS (3 Stat Cards)                      */}
         {/* ======================================================== */}
         <div className="space-y-2.5">
@@ -255,61 +294,67 @@ export default function MerchantDashboard({ onNavigateToProfile }) {
             <span className="text-xs text-stone-400">Updated 2m ago</span>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="grid grid-cols-3 gap-2 sm:gap-3">
             
             {/* Card 1: Bags Listed */}
-            <div className="bg-white rounded-2xl border border-stone-200/80 p-4 shadow-2xs space-y-2.5">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-medium text-stone-600">Bags Listed</span>
-                <div className="w-7 h-7 rounded-lg bg-teal-50 border border-teal-200/60 text-teal-700 flex items-center justify-center">
-                  <Package className="w-3.5 h-3.5" />
+            <div className="group bg-white rounded-2xl sm:rounded-3xl border border-stone-200/80 p-3 sm:p-4 shadow-2xs hover:shadow-md hover:-translate-y-1 hover:border-[#2E7D32]/40 transition-all duration-300 ease-out cursor-pointer flex flex-col justify-between space-y-2 sm:space-y-2.5">
+              <div className="flex items-start justify-between gap-1">
+                <span className="text-[11px] sm:text-xs font-semibold text-stone-600 leading-tight">Bags Listed</span>
+                <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-[#EAF7ED] border border-emerald-200/60 text-[#2E7D32] flex items-center justify-center shrink-0 group-hover:scale-110 group-hover:rotate-6 transition-all duration-300">
+                  <Package className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                 </div>
               </div>
-              <div className="space-y-1.5">
-                <div className="flex items-baseline gap-1.5">
-                  <span className="text-2xl font-black text-[#1C1C1E]">18</span>
-                  <span className="text-xs text-stone-500 font-medium">total</span>
+              <div className="space-y-1.5 sm:space-y-2">
+                <div className="flex items-baseline gap-1">
+                  <span className="text-base sm:text-lg font-black text-[#1C1C1E] group-hover:text-[#2E7D32] tracking-tight transition-colors duration-200">18</span>
+                  <span className="text-[10px] sm:text-xs text-stone-500 font-medium">total</span>
                 </div>
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-[#2E7D32]">
-                  <TrendingUp className="w-3 h-3" /> +4 vs yesterday
-                </span>
+                <div>
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-full text-[9px] sm:text-[11px] font-bold bg-[#EAF7ED] text-[#2E7D32] group-hover:bg-emerald-100 transition-colors">
+                    <TrendingUp className="w-2.5 h-2.5 sm:w-3 sm:h-3" /> +4 vs yesterday
+                  </span>
+                </div>
               </div>
             </div>
 
             {/* Card 2: Bags Sold */}
-            <div className="bg-white rounded-2xl border border-stone-200/80 p-4 shadow-2xs space-y-2.5">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-medium text-stone-600">Bags Sold</span>
-                <div className="w-7 h-7 rounded-lg bg-orange-50 border border-orange-200/60 text-orange-600 flex items-center justify-center">
-                  <Flame className="w-3.5 h-3.5" />
+            <div className="group bg-white rounded-2xl sm:rounded-3xl border border-stone-200/80 p-3 sm:p-4 shadow-2xs hover:shadow-md hover:-translate-y-1 hover:border-orange-300 transition-all duration-300 ease-out cursor-pointer flex flex-col justify-between space-y-2 sm:space-y-2.5">
+              <div className="flex items-start justify-between gap-1">
+                <span className="text-[11px] sm:text-xs font-semibold text-stone-600 leading-tight">Bags Sold</span>
+                <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-[#FFF3E8] border border-orange-200/60 text-[#FF8A3D] flex items-center justify-center shrink-0 group-hover:scale-110 group-hover:rotate-6 transition-all duration-300">
+                  <Flame className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                 </div>
               </div>
-              <div className="space-y-1.5">
-                <div className="flex items-baseline gap-1.5">
-                  <span className="text-2xl font-black text-[#1C1C1E]">14</span>
-                  <span className="text-xs text-stone-500 font-medium">reserved</span>
+              <div className="space-y-1.5 sm:space-y-2">
+                <div className="flex items-baseline gap-1">
+                  <span className="text-base sm:text-lg font-black text-[#1C1C1E] group-hover:text-[#FF8A3D] tracking-tight transition-colors duration-200">14</span>
+                  <span className="text-[10px] sm:text-xs text-stone-500 font-medium">reserved</span>
                 </div>
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-orange-100 text-[#D96B1C]">
-                  <Clock className="w-3 h-3" /> 78% sold out
-                </span>
+                <div>
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-full text-[9px] sm:text-[11px] font-bold bg-[#FFF1E6] text-[#D96B1C] group-hover:bg-orange-100 transition-colors">
+                    <Clock className="w-2.5 h-2.5 sm:w-3 sm:h-3" /> 78% sold out
+                  </span>
+                </div>
               </div>
             </div>
 
             {/* Card 3: Today's Revenue */}
-            <div className="bg-white rounded-2xl border border-stone-200/80 p-4 shadow-2xs space-y-2.5">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-medium text-stone-600">Today's Revenue</span>
-                <div className="w-7 h-7 rounded-lg bg-emerald-50 border border-emerald-200/60 text-emerald-700 flex items-center justify-center">
-                  <DollarSign className="w-3.5 h-3.5" />
+            <div className="group bg-white rounded-2xl sm:rounded-3xl border border-stone-200/80 p-3 sm:p-4 shadow-2xs hover:shadow-md hover:-translate-y-1 hover:border-[#2E7D32]/40 transition-all duration-300 ease-out cursor-pointer flex flex-col justify-between space-y-2 sm:space-y-2.5">
+              <div className="flex items-start justify-between gap-1">
+                <span className="text-[11px] sm:text-xs font-semibold text-stone-600 leading-tight">Today's Revenue</span>
+                <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-[#EAF7ED] border border-emerald-200/60 text-[#2E7D32] flex items-center justify-center shrink-0 group-hover:scale-110 group-hover:rotate-6 transition-all duration-300">
+                  <DollarSign className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                 </div>
               </div>
-              <div className="space-y-1.5">
-                <div className="flex items-baseline gap-1.5">
-                  <span className="text-2xl font-black text-[#1C1C1E]">$69.86</span>
+              <div className="space-y-1.5 sm:space-y-2">
+                <div className="flex items-baseline gap-1">
+                  <span className="text-base sm:text-lg font-black text-[#1C1C1E] group-hover:text-[#2E7D32] tracking-tight transition-colors duration-200">$69.86</span>
                 </div>
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-stone-100 text-stone-600">
-                  ⌛ $14.20 pending
-                </span>
+                <div>
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-full text-[9px] sm:text-[11px] font-bold bg-stone-100 text-stone-600 group-hover:bg-stone-200/80 transition-colors">
+                    <span>⌛</span> $14.20 pending
+                  </span>
+                </div>
               </div>
             </div>
 
@@ -367,23 +412,24 @@ export default function MerchantDashboard({ onNavigateToProfile }) {
 
           {/* Listing Cards */}
           <div className="space-y-3.5">
-            {listings.map((item) => (
+            {listings.map((item, idx) => (
               <div 
                 key={item.id}
-                className="bg-white rounded-3xl border border-stone-200/80 overflow-hidden shadow-2xs hover:shadow-xs transition-shadow"
+                style={{ animationDelay: `${idx * 80}ms` }}
+                className="bg-white rounded-3xl border border-stone-200/80 overflow-hidden interactive-card group shadow-2xs hover:border-emerald-300/80 cursor-pointer"
               >
                 {/* Image Banner */}
                 <div className="relative h-44 sm:h-52 w-full overflow-hidden bg-stone-100">
                   <img 
                     src={item.image} 
                     alt={item.title}
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ease-out"
                   />
 
                   {/* Top Floating Badges */}
                   <div className="absolute top-3 left-3 flex items-center gap-1.5">
-                    <span className="px-2.5 py-1 rounded-full bg-white/95 text-[#2E7D32] text-xs font-bold shadow-xs flex items-center gap-1.5 backdrop-blur-xs">
-                      <span className="w-2 h-2 rounded-full bg-[#2E7D32]" />
+                    <span className="px-2.5 py-1 rounded-full bg-white/95 text-[#2E7D32] text-xs font-bold shadow-xs flex items-center gap-1.5 backdrop-blur-xs group-hover:scale-105 transition-transform">
+                      <span className="w-2 h-2 rounded-full bg-[#2E7D32] animate-pulse" />
                       Active
                     </span>
                   </div>
@@ -396,8 +442,11 @@ export default function MerchantDashboard({ onNavigateToProfile }) {
 
                   {/* Edit Pencil Button */}
                   <button 
-                    onClick={() => setEditModalItem(item)}
-                    className="absolute bottom-3 right-3 w-9 h-9 rounded-full bg-white text-stone-800 shadow-md flex items-center justify-center hover:bg-stone-50 active:scale-95 transition-all"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setEditModalItem(item);
+                    }}
+                    className="absolute bottom-3 right-3 w-9 h-9 rounded-full bg-white text-stone-800 shadow-md flex items-center justify-center hover:bg-stone-50 hover:scale-110 active:scale-95 transition-all cursor-pointer"
                   >
                     <Edit2 className="w-4 h-4 text-stone-700" />
                   </button>
@@ -464,20 +513,21 @@ export default function MerchantDashboard({ onNavigateToProfile }) {
           </div>
 
           <div className="space-y-2.5">
-            {reservations.map((res) => (
+            {reservations.map((res, idx) => (
               <div 
                 key={res.id}
-                className="bg-white rounded-2xl border border-stone-200/80 p-3.5 sm:p-4 flex items-center justify-between gap-3 shadow-2xs hover:border-stone-300 transition-colors"
+                style={{ animationDelay: `${idx * 60}ms` }}
+                className="bg-white rounded-2xl border border-stone-200/80 p-3.5 sm:p-4 flex items-center justify-between gap-3 shadow-2xs interactive-card hover:border-emerald-300/80 cursor-pointer"
               >
                 {/* Left: Avatar + Details */}
                 <div className="flex items-center gap-3">
-                  <div className={`w-10 h-10 rounded-2xl ${res.avatarColor} font-black text-xs flex items-center justify-center shrink-0 shadow-2xs`}>
+                  <div className={`w-10 h-10 rounded-2xl ${res.avatarColor} font-black text-xs flex items-center justify-center shrink-0 shadow-2xs group-hover:scale-105 transition-transform`}>
                     {res.initials}
                   </div>
                   <div className="space-y-0.5">
                     <div className="flex items-center gap-1.5">
                       <h4 className="font-bold text-xs sm:text-sm text-[#1C1C1E]">{res.customerName}</h4>
-                      <span className="text-[10px] font-mono text-stone-500 font-semibold">{res.code}</span>
+                      <span className="text-[10px] font-mono text-stone-500 font-semibold bg-stone-100 px-1.5 py-0.5 rounded">{res.code}</span>
                     </div>
                     <p className="text-[11px] text-stone-500">
                       {res.items} • Paid <span className="font-semibold text-stone-800">{res.paidAmount}</span>
@@ -488,7 +538,7 @@ export default function MerchantDashboard({ onNavigateToProfile }) {
                 {/* Right: Status Pill & ETA */}
                 <div className="text-right shrink-0">
                   <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-[#2E7D32]">
-                    <span className="w-1.5 h-1.5 rounded-full bg-[#2E7D32]" />
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#2E7D32] animate-pulse" />
                     {res.status}
                   </span>
                   <p className="text-[10px] text-stone-500 font-medium mt-1">{res.eta}</p>

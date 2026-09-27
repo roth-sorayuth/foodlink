@@ -1,0 +1,219 @@
+// Prisma schema for FoodLink (Fullstack Surplus Food Platform)
+// Datasource points to Supabase PostgreSQL
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ----------------------------------------------------
+// ENUMS
+// ----------------------------------------------------
+
+enum Role {
+  CUSTOMER
+  MERCHANT
+  ADMIN
+}
+
+enum OrderStatus {
+  PENDING       // Placed, waiting for pickup window
+  READY         // Ready at merchant counter
+  COMPLETED     // Verified and picked up
+  CANCELLED     // Cancelled / refunded
+}
+
+enum ListingStatus {
+  ACTIVE
+  SOLD_OUT
+  PAUSED
+  EXPIRED
+}
+
+// ----------------------------------------------------
+// 1. USER & AUTH MODEL (Customers, Merchants, Admins)
+// ----------------------------------------------------
+
+model User {
+  id                 String         @id @default(cuid())
+  email              String         @unique
+  name               String
+  role               Role           @default(CUSTOMER)
+  phone              String?
+  avatarUrl          String?        @default("https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=120&q=80")
+  
+  // Impact & Stats
+  co2SavedKg         Float          @default(0.0)
+  moneySaved         Float          @default(0.0)
+  mealsRescued       Int            @default(0)
+  
+  // Preferences
+  radarRadius        Float          @default(2.0) // Miles
+  dietaryPreferences String[]       @default([])
+  
+  // Relationships
+  store              Store?         // Only if role == MERCHANT
+  orders             Order[]
+  favorites          Favorite[]
+  reviews            Review[]
+  notifications      Notification[]
+
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+}
+
+// ----------------------------------------------------
+// 2. STORE / MERCHANT PROFILE MODEL
+// ----------------------------------------------------
+
+model Store {
+  id              String      @id @default(cuid())
+  name            String
+  description     String?
+  category        String      @default("Bakery & Cafe")
+  address         String?
+  latitude        Float?
+  longitude       Float?
+  phone           String?
+  rating          Float       @default(4.9)
+  reviewCount     String      @default("340+")
+  distance        String      @default("0.4 mi")
+  logoUrl         String?     @default("https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=200&q=80")
+  bannerUrl       String?
+  acceptingOrders Boolean     @default(true)
+
+  // Relationships
+  ownerId         String?     @unique
+  owner           User?       @relation(fields: [ownerId], references: [id])
+  listings        Listing[]
+  orders          Order[]
+
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+}
+
+// ----------------------------------------------------
+// 3. PRODUCT / SURPLUS LISTING MODEL
+// ----------------------------------------------------
+
+model Listing {
+  id            String        @id @default(cuid())
+  title         String
+  description   String?
+  category      String        @default("baked") // baked, meals, groceries, produce
+  photoUrl      String        @default("https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=700&q=80")
+  originalPrice Float
+  price         Float
+  discount      String        @default("70% OFF")
+  bagsAvailable Int           @default(5)
+  bagsSold      Int           @default(0)
+  status        ListingStatus @default(ACTIVE)
+
+  // Pickup Windows
+  pickupDate    String        @default("Today")
+  pickupStart   String        @default("6:30 PM")
+  pickupEnd     String        @default("7:30 PM")
+  
+  // Sustainability & Details
+  dietaryTags   String[]      @default([]) // vegetarian, vegan, nut-free, halal
+  co2SavedKg    Float         @default(1.2)
+
+  // Relationships
+  storeId       String?
+  store         Store?        @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  storeName     String        @default("Artisan Bakery & Cafe")
+  orders        Order[]
+
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+}
+
+// ----------------------------------------------------
+// 4. ORDER / RESCUE RESERVATION MODEL
+// ----------------------------------------------------
+
+model Order {
+  id             String      @id @default(cuid())
+  orderNumber    String      @unique // e.g., "#FS-84920"
+  pickupCode     String      // e.g., "SAVER-789"
+  qrCodeData     String?
+  quantity       Int         @default(1)
+  totalPrice     Float
+  status         OrderStatus @default(PENDING)
+  
+  // Pickup Times
+  pickupDate     String      @default("Today")
+  pickupStart    String      @default("6:30 PM")
+  pickupEnd      String      @default("7:30 PM")
+  verifiedAt     DateTime?
+
+  // Impact
+  co2SavedKg     Float       @default(1.2)
+  moneySaved     Float       @default(0.0)
+
+  // Relationships
+  userId         String
+  user           User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  storeId        String
+  store          Store       @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  listingId      String
+  listing        Listing     @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  review         Review?
+
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+}
+
+// ----------------------------------------------------
+// 5. CUSTOMER FAVORITES / BOOKMARKS
+// ----------------------------------------------------
+
+model Favorite {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  storeId   String?
+  listingId String?
+  createdAt DateTime @default(now())
+
+  @@unique([userId, storeId])
+}
+
+// ----------------------------------------------------
+// 6. REVIEWS & RATINGS
+// ----------------------------------------------------
+
+model Review {
+  id        String   @id @default(cuid())
+  rating    Int      @default(5)
+  comment   String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  orderId   String?  @unique
+  order     Order?   @relation(fields: [orderId], references: [id])
+  createdAt DateTime @default(now())
+}
+
+// ----------------------------------------------------
+// 7. REAL-TIME NOTIFICATIONS
+// ----------------------------------------------------
+
+model Notification {
+  id        String   @id @default(cuid())
+  type      String   @default("NEW_LISTING") // NEW_LISTING, ORDER_READY, PICKUP_VERIFIED
+  title     String
+  message   String
+  listingId String?
+  orderId   String?
+  isRead    Boolean  @default(false)
+
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+}

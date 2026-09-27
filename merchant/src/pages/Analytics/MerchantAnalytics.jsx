@@ -56,7 +56,7 @@ export default function MerchantAnalytics({ onNavigateToProfile }) {
       <div className="flex items-center justify-between pt-1">
         <div>
           <h1 className="text-xl font-extrabold text-[#1C1C1E] tracking-tight">Analytics & Impact</h1>
-          <p className="text-xs text-stone-500">Performance metrics for Golden Gate Bakery</p>
+          <p className="text-xs text-stone-500">Performance metrics for CAD Bakery</p>
         </div>
 
         <button
