@@ -24,6 +24,8 @@ export default function App() {
   const [currentScreen, setCurrentScreen] = useState('discover');
   const [activeBottomTab, setActiveBottomTab] = useState('discover');
   const [selectedListing, setSelectedListing] = useState(null);
+  const [reserveQuantity, setReserveQuantity] = useState(1);
+  const [activeOrder, setActiveOrder] = useState(null);
   const [toastMessage, setToastMessage] = useState(null);
 
   // Real-time Popup Alert State
@@ -52,21 +54,35 @@ export default function App() {
 
   const handleSelectListing = (item) => {
     setSelectedListing(item);
+    setReserveQuantity(1);
     setCurrentScreen('listing-detail');
   };
 
-  const handleProceedToCheckout = () => {
+  const handleProceedToCheckout = (qty = 1) => {
+    setReserveQuantity(qty);
     setCurrentScreen('checkout');
   };
 
-  const handleConfirmPayment = async () => {
+  const handleConfirmPayment = async (details = {}) => {
+    const finalQty = details.quantity || reserveQuantity || 1;
+    const orderData = {
+      orderId: 'FS-84920',
+      digits: ['7', '8', '9'],
+      quantity: finalQty,
+      listing: selectedListing,
+      totalPaid: details.totalDue || ((4.99 * finalQty) + 0.91).toFixed(2),
+      storeName: selectedListing?.store || selectedListing?.storeName || 'Golden Gate Bakery & Cafe'
+    };
+
     try {
       if (selectedListing?.id) {
-        await reserveListing(selectedListing.id, 1);
+        await reserveListing(selectedListing.id, finalQty);
       }
     } catch (err) {
       console.warn('Realtime reservation socket trigger:', err.message);
     }
+
+    setActiveOrder(orderData);
     showToast('Payment confirmed! Pickup pass generated.');
     setCurrentScreen('reserved');
     setActiveBottomTab('reserved');
@@ -137,6 +153,7 @@ export default function App() {
         {currentScreen === 'listing-detail' && (
           <CustomerListingDetail
             listing={selectedListing}
+            initialQuantity={reserveQuantity}
             onBack={() => setCurrentScreen(activeBottomTab === 'explore' ? 'explore' : 'discover')}
             onProceedToCheckout={handleProceedToCheckout}
             onNavigateToProfile={() => {
@@ -150,6 +167,7 @@ export default function App() {
         {currentScreen === 'checkout' && (
           <CustomerCheckoutFlow
             listing={selectedListing}
+            quantity={reserveQuantity}
             onBack={() => setCurrentScreen('listing-detail')}
             onConfirmPayment={handleConfirmPayment}
             onNavigateToProfile={() => {
@@ -162,6 +180,7 @@ export default function App() {
         {/* Screen 5: Reserved (Active Pickup Screen) */}
         {currentScreen === 'reserved' && (
           <CustomerActivePickup
+            order={activeOrder}
             onBackToHome={() => {
               setCurrentScreen('discover');
               setActiveBottomTab('discover');

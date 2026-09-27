@@ -15,14 +15,19 @@ import {
   ShieldCheck,
   Calendar,
   Navigation,
-  Check
+  Check,
+  Plus,
+  Minus
 } from 'lucide-react';
 
 export default function CustomerListingDetail({
+  listing,
+  initialQuantity = 1,
   onBack,
   onProceedToCheckout,
   onNavigateToProfile
 }) {
+  const [quantity, setQuantity] = useState(initialQuantity);
   const [isFavorite, setIsFavorite] = useState(false);
   const [timeLeft, setTimeLeft] = useState({ hours: 2, minutes: 14, seconds: 43 });
 
@@ -368,20 +373,49 @@ export default function CustomerListingDetail({
           <div className="hidden lg:block bg-white rounded-3xl border border-stone-200/80 p-5 shadow-2xs space-y-3">
             <div className="flex items-baseline justify-between">
               <div>
-                <span className="text-2xl font-black text-[#1C1C1E]">$4.99</span>
-                <span className="text-xs text-stone-400 line-through ml-2">$16.00 value</span>
+                <span className="text-2xl font-black text-[#1C1C1E]">${(4.99 * quantity).toFixed(2)}</span>
+                <span className="text-xs text-stone-400 line-through ml-2">${(16.00 * quantity).toFixed(2)} value</span>
               </div>
               <span className="px-2.5 py-0.5 rounded-full bg-orange-100 text-[#D96B1C] text-xs font-bold">
                 Save 69%
               </span>
             </div>
 
+            {/* Quantity Selector Control */}
+            <div className="flex items-center justify-between p-3 rounded-2xl bg-stone-50 border border-stone-200/80">
+              <div className="flex flex-col">
+                <span className="text-xs font-bold text-stone-800">Select Quantity</span>
+                <span className="text-[10px] text-stone-400 font-medium">Max 5 per order</span>
+              </div>
+              <div className="flex items-center gap-3 bg-white border border-stone-200 rounded-xl px-2 py-1 shadow-2xs">
+                <button
+                  type="button"
+                  onClick={() => setQuantity(prev => Math.max(1, prev - 1))}
+                  disabled={quantity <= 1}
+                  className="w-7 h-7 rounded-lg bg-stone-100 hover:bg-stone-200 disabled:opacity-30 disabled:hover:bg-stone-100 font-extrabold text-stone-800 flex items-center justify-center transition-colors cursor-pointer"
+                  title="Decrease quantity"
+                >
+                  <Minus className="w-3.5 h-3.5" />
+                </button>
+                <span className="font-mono font-black text-base text-stone-900 w-5 text-center">{quantity}</span>
+                <button
+                  type="button"
+                  onClick={() => setQuantity(prev => Math.min(5, prev + 1))}
+                  disabled={quantity >= 5}
+                  className="w-7 h-7 rounded-lg bg-[#2E7D32] hover:bg-[#1b5e20] text-white disabled:opacity-30 font-extrabold flex items-center justify-center transition-colors cursor-pointer"
+                  title="Increase quantity"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+
             <button
-              onClick={onProceedToCheckout}
+              onClick={() => onProceedToCheckout && onProceedToCheckout(quantity)}
               className="w-full py-4 rounded-2xl bg-[#1b5e20] hover:bg-[#144919] text-white font-extrabold text-sm flex items-center justify-center gap-2 shadow-sm transition-transform active:scale-[0.99] cursor-pointer"
             >
               <ShoppingBag className="w-4 h-4" />
-              <span>Reserve 1 Surprise Bag</span>
+              <span>Reserve {quantity} Surprise Bag{quantity > 1 ? 's' : ''} (${(4.99 * quantity).toFixed(2)})</span>
             </button>
             <p className="text-[11px] text-stone-400 text-center">
               ✔ Pay now • Free cancellation up to 2 hours before pickup
@@ -394,26 +428,45 @@ export default function CustomerListingDetail({
 
       {/* Sticky Bottom Action Bar (Mobile view) */}
       <div className="lg:hidden fixed bottom-0 inset-x-0 bg-white/95 backdrop-blur-md border-t border-stone-200/80 px-4 py-3 z-50">
-        <div className="max-w-md mx-auto space-y-2">
+        <div className="max-w-md mx-auto space-y-2.5">
           
           <div className="flex items-center justify-between text-xs px-1">
             <div className="flex items-baseline gap-1.5">
-              <span className="text-lg font-black text-[#1C1C1E]">$4.99</span>
-              <span className="text-xs text-stone-400 line-through">$16.00 value</span>
+              <span className="text-lg font-black text-[#1C1C1E]">${(4.99 * quantity).toFixed(2)}</span>
+              <span className="text-xs text-stone-400 line-through">${(16.00 * quantity).toFixed(2)} value</span>
               <span className="px-1.5 py-0.5 rounded bg-orange-100 text-[#D96B1C] text-[10px] font-bold">
                 Save 69%
               </span>
             </div>
 
-            <span className="text-[11px] font-bold text-orange-600">🔥 Only 2 left</span>
+            {/* Quantity Selector Control (Mobile) */}
+            <div className="flex items-center gap-2 bg-stone-100 border border-stone-200/80 rounded-xl px-2 py-0.5">
+              <button
+                type="button"
+                onClick={() => setQuantity(prev => Math.max(1, prev - 1))}
+                disabled={quantity <= 1}
+                className="w-6 h-6 rounded-md bg-white disabled:opacity-30 font-black text-stone-800 flex items-center justify-center shadow-2xs transition-colors cursor-pointer"
+              >
+                <Minus className="w-3 h-3" />
+              </button>
+              <span className="font-mono font-black text-xs text-stone-900 w-4 text-center">{quantity}</span>
+              <button
+                type="button"
+                onClick={() => setQuantity(prev => Math.min(5, prev + 1))}
+                disabled={quantity >= 5}
+                className="w-6 h-6 rounded-md bg-[#2E7D32] text-white disabled:opacity-30 font-black flex items-center justify-center shadow-2xs transition-colors cursor-pointer"
+              >
+                <Plus className="w-3 h-3" />
+              </button>
+            </div>
           </div>
 
           <button
-            onClick={onProceedToCheckout}
+            onClick={() => onProceedToCheckout && onProceedToCheckout(quantity)}
             className="w-full py-3.5 rounded-2xl bg-[#1b5e20] hover:bg-[#144919] text-white font-extrabold text-sm flex items-center justify-center gap-2 shadow-sm transition-transform active:scale-[0.99] cursor-pointer"
           >
             <ShoppingBag className="w-4 h-4" />
-            <span>Reserve 1 Surprise Bag</span>
+            <span>Reserve {quantity} Surprise Bag{quantity > 1 ? 's' : ''} (${(4.99 * quantity).toFixed(2)})</span>
           </button>
 
           <p className="text-[10px] text-stone-400 text-center">

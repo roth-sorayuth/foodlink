@@ -11,16 +11,28 @@ import {
   ShieldCheck,
   CreditCard,
   ChevronRight,
-  Sparkles
+  Sparkles,
+  Plus,
+  Minus,
+  QrCode,
+  X
 } from 'lucide-react';
 
 export default function CustomerCheckoutFlow({
+  listing,
+  quantity: initialQuantity = 1,
   onBack,
   onConfirmPayment,
   onNavigateToProfile
 }) {
   const [bringTote, setBringTote] = useState(true);
   const [timerSeconds, setTimerSeconds] = useState(580); // 09:40
+  const [quantity, setQuantity] = useState(initialQuantity);
+  const [showQrModal, setShowQrModal] = useState(false);
+
+  useEffect(() => {
+    setQuantity(initialQuantity);
+  }, [initialQuantity]);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -35,8 +47,32 @@ export default function CustomerCheckoutFlow({
     return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
   };
 
+  // Dynamic calculations based on quantity
+  const unitPrice = 4.99;
+  const unitOrigValue = 16.00;
+  const unitSavings = 11.01;
+  const platformFee = 0.49;
+  const taxPerUnit = 0.42;
+
+  const bagSubtotal = unitPrice * quantity;
+  const origTotal = unitOrigValue * quantity;
+  const totalSavings = unitSavings * quantity;
+  const totalTax = taxPerUnit * quantity;
+  const totalDue = bagSubtotal + platformFee + totalTax;
+
+  const handlePayClick = () => {
+    setShowQrModal(true);
+  };
+
+  const handleFinalizePayment = () => {
+    setShowQrModal(false);
+    if (onConfirmPayment) {
+      onConfirmPayment({ quantity, totalDue: totalDue.toFixed(2) });
+    }
+  };
+
   return (
-    <div className="space-y-4 pb-28">
+    <div className="space-y-4 pb-28 relative">
       
       {/* Top Header */}
       <div className="flex items-center justify-between pb-1">
@@ -83,7 +119,7 @@ export default function CustomerCheckoutFlow({
       <div className="p-3.5 rounded-2xl bg-[#FF8A3D] text-white flex items-center justify-between text-xs font-bold shadow-xs">
         <div className="flex items-center gap-2">
           <Clock className="w-4 h-4 animate-spin-slow" />
-          <span>Held for {formatTimer(timerSeconds)} • Bag is reserved</span>
+          <span>Held for {formatTimer(timerSeconds)} • {quantity} Bag{quantity > 1 ? 's' : ''} reserved</span>
         </div>
         <Lock className="w-3.5 h-3.5" />
       </div>
@@ -109,13 +145,37 @@ export default function CustomerCheckoutFlow({
                 </span>
               </div>
 
-              <div className="space-y-0.5">
+              <div className="space-y-0.5 flex-1">
                 <span className="text-[10px] font-extrabold uppercase tracking-wider text-amber-700 flex items-center gap-1">
                   <Check className="w-3 h-3 stroke-[3]" /> ARTISAN BAKERY
                 </span>
-                <h3 className="font-extrabold text-base text-[#1C1C1E]">Golden Gate Bakery & C...</h3>
-                <p className="text-xs font-semibold text-stone-700">1× Pastry & Sourdough Surprise Bag</p>
-                <p className="text-[11px] text-stone-500 flex items-center gap-1">
+                <h3 className="font-extrabold text-base text-[#1C1C1E]">Golden Gate Bakery & Cafe</h3>
+                <div className="flex items-center justify-between pt-0.5">
+                  <p className="text-xs font-bold text-stone-800">{quantity}× Pastry & Sourdough Surprise Bag</p>
+                  
+                  {/* Quantity Adjustment Buttons */}
+                  <div className="flex items-center gap-1.5 bg-stone-100 border border-stone-200 rounded-lg px-1.5 py-0.5">
+                    <button
+                      type="button"
+                      onClick={() => setQuantity(prev => Math.max(1, prev - 1))}
+                      disabled={quantity <= 1}
+                      className="w-5 h-5 rounded bg-white text-stone-700 font-bold flex items-center justify-center disabled:opacity-30 cursor-pointer"
+                    >
+                      <Minus className="w-3 h-3" />
+                    </button>
+                    <span className="font-mono font-bold text-xs w-4 text-center">{quantity}</span>
+                    <button
+                      type="button"
+                      onClick={() => setQuantity(prev => Math.min(5, prev + 1))}
+                      disabled={quantity >= 5}
+                      className="w-5 h-5 rounded bg-[#2E7D32] text-white font-bold flex items-center justify-center disabled:opacity-30 cursor-pointer"
+                    >
+                      <Plus className="w-3 h-3" />
+                    </button>
+                  </div>
+                </div>
+
+                <p className="text-[11px] text-stone-500 flex items-center gap-1 pt-1">
                   <MapPin className="w-3 h-3 text-[#2E7D32]" />
                   <span>542 Valencia St, Mission District</span>
                 </p>
@@ -140,24 +200,24 @@ export default function CustomerCheckoutFlow({
             {/* Eco Impact Banner */}
             <div className="p-3 rounded-2xl bg-[#EAF7ED] border border-emerald-200/80 flex items-center gap-2 text-xs font-bold text-[#1b5e20]">
               <Leaf className="w-4 h-4 fill-emerald-600/30" />
-              <span>2.5 kg CO₂ emissions prevented by rescuing this bundle today!</span>
+              <span>{(2.5 * quantity).toFixed(1)} kg CO₂ emissions prevented by rescuing this bundle today!</span>
             </div>
 
             {/* Price Breakdown Table */}
             <div className="space-y-2 pt-2 border-t border-stone-100 text-xs">
               <div className="flex justify-between text-stone-500">
-                <span>Standard Store Value</span>
-                <span className="line-through">$16.00</span>
+                <span>Standard Store Value ({quantity}×)</span>
+                <span className="line-through">${origTotal.toFixed(2)}</span>
               </div>
 
               <div className="flex justify-between text-[#2E7D32] font-bold">
                 <span>Surplus Rescue Savings (69% off)</span>
-                <span>-$11.01</span>
+                <span>-${totalSavings.toFixed(2)}</span>
               </div>
 
               <div className="flex justify-between font-bold text-stone-900">
-                <span>Bag Price</span>
-                <span>$4.99</span>
+                <span>Bag Price ({quantity}× ${unitPrice.toFixed(2)})</span>
+                <span>${bagSubtotal.toFixed(2)}</span>
               </div>
 
               <div className="flex justify-between text-stone-500">
@@ -165,12 +225,12 @@ export default function CustomerCheckoutFlow({
                   <span>Platform & Climate Fee</span>
                   <Info className="w-3 h-3 text-stone-400" />
                 </span>
-                <span>$0.49</span>
+                <span>${platformFee.toFixed(2)}</span>
               </div>
 
               <div className="flex justify-between text-stone-500">
                 <span>Estimated Sales Tax</span>
-                <span>$0.42</span>
+                <span>${totalTax.toFixed(2)}</span>
               </div>
 
               <div className="flex items-baseline justify-between pt-3 border-t border-stone-200">
@@ -178,7 +238,7 @@ export default function CustomerCheckoutFlow({
                   <span className="font-extrabold text-base text-[#1C1C1E] block">Total Due Now</span>
                   <span className="text-[10px] text-amber-700 font-semibold">Guaranteed fresh or credited</span>
                 </div>
-                <span className="text-2xl font-black text-[#1b5e20]">$5.90</span>
+                <span className="text-2xl font-black text-[#1b5e20]">${totalDue.toFixed(2)}</span>
               </div>
             </div>
 
@@ -223,21 +283,19 @@ export default function CustomerCheckoutFlow({
           <div className="bg-white rounded-3xl border border-stone-200/80 p-4 sm:p-5 shadow-2xs space-y-3">
             <div className="flex items-center justify-between">
               <span className="font-extrabold text-sm text-[#1C1C1E]">Payment Method</span>
-              <button className="text-xs font-bold text-[#2E7D32] hover:underline">Change</button>
+              <span className="text-xs font-bold text-[#2E7D32]">KHQR / Bakong / Card</span>
             </div>
 
             <div className="p-3 rounded-2xl bg-stone-50 border border-stone-200/80 flex items-center justify-between text-xs">
               <div className="flex items-center gap-3">
-                <div className="w-9 h-6 bg-black text-white rounded-md flex items-center justify-center font-bold text-[10px] shadow-2xs">
-                  Pay
+                <div className="w-9 h-6 bg-red-600 text-white rounded-md flex items-center justify-center font-black text-[9px] shadow-2xs">
+                  KHQR
                 </div>
                 <div>
                   <div className="flex items-center gap-1.5 font-bold text-stone-900">
-                    <span>Apple Pay</span>
-                    <span>•</span>
-                    <span className="text-stone-400 font-normal">Default</span>
+                    <span>Bakong / KHQR Instant Pay</span>
                   </div>
-                  <span className="text-[11px] text-stone-500">Card ending in •••• 4242</span>
+                  <span className="text-[11px] text-stone-500">Scan or direct click to pay</span>
                 </div>
               </div>
 
@@ -275,11 +333,11 @@ export default function CustomerCheckoutFlow({
           {/* Desktop Confirm CTA */}
           <div className="hidden lg:block space-y-2 pt-2">
             <button
-              onClick={onConfirmPayment}
+              onClick={handlePayClick}
               className="w-full py-4 rounded-2xl bg-[#1b5e20] hover:bg-[#144919] text-white font-extrabold text-sm flex items-center justify-center gap-2 shadow-sm transition-transform active:scale-[0.99] cursor-pointer"
             >
               <Lock className="w-4 h-4" />
-              <span>Confirm & Pay $5.90</span>
+              <span>Confirm & Pay ${totalDue.toFixed(2)}</span>
             </button>
             <p className="text-[11px] text-stone-400 text-center">
               🔒 256-bit Encrypted Checkout • Instant Confirmation
@@ -294,17 +352,110 @@ export default function CustomerCheckoutFlow({
       <div className="lg:hidden fixed bottom-0 inset-x-0 bg-white/95 backdrop-blur-md border-t border-stone-200/80 px-4 py-3 z-50">
         <div className="max-w-md mx-auto space-y-1.5">
           <button
-            onClick={onConfirmPayment}
+            onClick={handlePayClick}
             className="w-full py-3.5 rounded-2xl bg-[#1b5e20] hover:bg-[#144919] text-white font-extrabold text-sm flex items-center justify-center gap-2 shadow-sm transition-transform active:scale-[0.99] cursor-pointer"
           >
             <Lock className="w-4 h-4" />
-            <span>Confirm & Pay $5.90</span>
+            <span>Confirm & Pay ${totalDue.toFixed(2)}</span>
           </button>
           <p className="text-[10px] text-stone-400 text-center">
             🔒 256-bit Encrypted Checkout • Instant Confirmation
           </p>
         </div>
       </div>
+
+      {/* Small UI Logic: QR Code Modal with Direct Pay Button (No scan required!) */}
+      {showQrModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-stone-900/60 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="relative w-full max-w-sm bg-white rounded-3xl shadow-2xl border border-stone-200/80 overflow-hidden my-auto p-5 text-center space-y-4">
+            
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b border-stone-100 pb-3">
+              <div className="flex items-center gap-2">
+                <span className="px-2 py-0.5 rounded bg-red-600 text-white font-black text-[10px] uppercase tracking-wider">
+                  KHQR
+                </span>
+                <span className="text-xs font-bold text-stone-800">Instant Payment QR</span>
+              </div>
+              <button
+                onClick={() => setShowQrModal(false)}
+                className="p-1 rounded-full text-stone-400 hover:text-stone-700 hover:bg-stone-100 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Total Price */}
+            <div>
+              <span className="text-xs text-stone-500 font-medium">Total Payment Amount</span>
+              <div className="text-3xl font-black text-[#1b5e20] mt-0.5">${totalDue.toFixed(2)}</div>
+              <span className="text-[11px] text-stone-400 font-medium">
+                {quantity} Surprise Bag{quantity > 1 ? 's' : ''} · Golden Gate Bakery
+              </span>
+            </div>
+
+            {/* Styled QR Code Box */}
+            <div className="relative mx-auto w-48 h-48 p-3 bg-white rounded-2xl border-2 border-red-500 shadow-xs flex flex-col items-center justify-center">
+              <div className="absolute top-1.5 left-2 text-[9px] font-black text-red-600 tracking-widest">
+                KHQR
+              </div>
+              <div className="absolute top-1.5 right-2 text-[9px] font-bold text-stone-400">
+                BAKONG
+              </div>
+
+              <div className="w-36 h-36 bg-stone-950 p-2 rounded-xl flex items-center justify-center relative overflow-hidden">
+                <svg viewBox="0 0 100 100" className="w-full h-full text-white fill-current">
+                  <rect x="5" y="5" width="28" height="28" fill="white" rx="4"/>
+                  <rect x="9" y="9" width="20" height="20" fill="black" rx="2"/>
+                  <rect x="13" y="13" width="12" height="12" fill="white" rx="1"/>
+
+                  <rect x="67" y="5" width="28" height="28" fill="white" rx="4"/>
+                  <rect x="71" y="9" width="20" height="20" fill="black" rx="2"/>
+                  <rect x="75" y="13" width="12" height="12" fill="white" rx="1"/>
+
+                  <rect x="5" y="67" width="28" height="28" fill="white" rx="4"/>
+                  <rect x="9" y="71" width="20" height="20" fill="black" rx="2"/>
+                  <rect x="13" y="75" width="12" height="12" fill="white" rx="1"/>
+
+                  <rect x="38" y="10" width="8" height="8" fill="white"/>
+                  <rect x="50" y="10" width="8" height="8" fill="white"/>
+                  <rect x="38" y="22" width="6" height="6" fill="white"/>
+                  <rect x="48" y="22" width="10" height="6" fill="white"/>
+
+                  <rect x="10" y="38" width="12" height="6" fill="white"/>
+                  <rect x="26" y="38" width="8" height="8" fill="white"/>
+                  <rect x="40" y="36" width="18" height="18" fill="white"/>
+                  <rect x="65" y="38" width="12" height="8" fill="white"/>
+
+                  <rect x="38" y="66" width="8" height="10" fill="white"/>
+                  <rect x="50" y="66" width="6" height="6" fill="white"/>
+                  <rect x="62" y="68" width="12" height="8" fill="white"/>
+                </svg>
+
+                <div className="absolute inset-0 m-auto w-8 h-8 rounded-md bg-red-600 border-2 border-white flex items-center justify-center text-white font-black text-[8px]">
+                  KHQR
+                </div>
+              </div>
+            </div>
+
+            {/* Note stating no scan needed */}
+            <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs font-semibold flex items-center justify-center gap-1.5">
+              <Sparkles className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+              <span>No scan needed! Just click pay below</span>
+            </div>
+
+            {/* Direct Click to Pay Button */}
+            <button
+              onClick={handleFinalizePayment}
+              className="w-full py-3.5 rounded-2xl bg-[#1b5e20] hover:bg-[#144919] text-white font-extrabold text-sm flex items-center justify-center gap-2 shadow-md cursor-pointer transition-transform active:scale-[0.98]"
+            >
+              <CheckCircle2 className="w-4 h-4 text-emerald-300" />
+              <span>Pay ${totalDue.toFixed(2)}</span>
+            </button>
+
+          </div>
+        </div>
+      )}
 
     </div>
   );

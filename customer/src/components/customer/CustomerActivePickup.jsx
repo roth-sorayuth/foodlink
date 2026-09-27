@@ -14,9 +14,15 @@ import {
 } from 'lucide-react';
 
 export default function CustomerActivePickup({
+  order,
   onBackToHome,
   onNavigateToProfile
 }) {
+  const orderId = order?.orderId || 'FS-84920';
+  const storeName = order?.listing?.store || order?.storeName || 'Golden Gate Bakery & Cafe';
+  const quantity = order?.quantity || 1;
+  const digits = order?.digits || ['7', '8', '9'];
+
   return (
     <div className="space-y-4 pb-20">
       
@@ -41,7 +47,7 @@ export default function CustomerActivePickup({
         >
           <img
             src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=120&q=80"
-            alt="Sarah Jenkins"
+            alt="User Avatar"
             className="w-full h-full object-cover"
           />
         </button>
@@ -62,8 +68,10 @@ export default function CustomerActivePickup({
             <span>Surplus Rescued!</span>
           </span>
 
-          <h2 className="text-2xl font-black text-[#1C1C1E] tracking-tight">You Rescued a Surprise Bag!</h2>
-          <p className="text-xs text-stone-500 font-medium">Order #FS-84920 · Golden Gate Bakery & Cafe</p>
+          <h2 className="text-2xl font-black text-[#1C1C1E] tracking-tight">
+            You Rescued {quantity > 1 ? `${quantity} Surprise Bags!` : 'a Surprise Bag!'}
+          </h2>
+          <p className="text-xs text-stone-500 font-medium">Order #{orderId} · {storeName}</p>
         </div>
       </div>
 
@@ -73,25 +81,30 @@ export default function CustomerActivePickup({
         {/* Left Column: Digital Pickup Pass */}
         <div className="lg:col-span-6 space-y-4">
           
-          {/* Digital Pickup Pass Barcode Card */}
+          {/* Digital Pickup Pass Pass Card */}
           <div className="bg-white rounded-3xl border border-stone-200/80 p-5 sm:p-6 shadow-2xs space-y-5 relative overflow-hidden">
             <div className="space-y-2 text-center">
               <span className="text-[10px] font-bold uppercase tracking-wider text-stone-400">
                 OFFICIAL DIGITAL PICKUP PASS
               </span>
               <div className="font-mono text-2xl font-black text-[#1C1C1E] tracking-widest">
-                SAVER - 7 8 9
+                SAVER - {digits.join(' ')}
               </div>
             </div>
 
-            {/* Barcode Graphic */}
-            <div className="p-4 bg-stone-50 rounded-2xl flex flex-col items-center justify-center space-y-2">
-              <div className="w-full h-16 flex items-center justify-center gap-1">
-                {[4, 2, 6, 2, 8, 3, 2, 5, 2, 7, 3, 4, 2, 6, 2, 8, 2, 4, 3, 5, 2, 7, 4, 2, 6, 3, 5].map((w, i) => (
-                  <div key={i} className="h-12 bg-stone-900 rounded-xs" style={{ width: `${w}px` }} />
+            {/* Digits Only Code Display (NO BARCODE) */}
+            <div className="p-5 bg-stone-50 rounded-2xl border border-stone-200/70 flex flex-col items-center justify-center space-y-3">
+              <div className="flex items-center justify-center gap-3">
+                {digits.map((d, i) => (
+                  <div
+                    key={i}
+                    className="w-14 h-16 rounded-2xl bg-white border-2 border-[#1b5e20] flex items-center justify-center font-mono text-3xl font-black text-[#1C1C1E] shadow-xs"
+                  >
+                    {d}
+                  </div>
                 ))}
               </div>
-              <span className="text-[10px] font-mono text-stone-500 tracking-wider font-semibold">
+              <span className="text-[10px] font-mono text-stone-500 tracking-widest font-extrabold uppercase">
                 SCAN AT COUNTER UPON ARRIVAL
               </span>
             </div>
@@ -108,7 +121,7 @@ export default function CustomerActivePickup({
               <div className="flex items-center gap-2">
                 <Clock className="w-4 h-4 text-stone-500" />
                 <div>
-                  <span className="text-[10px] text-stone-400 uppercase font-bold block">Pickup Window</span>
+                  <span className="text-[10px] text-stone-400 uppercase font-bold block">PICKUP WINDOW</span>
                   <span className="font-extrabold text-stone-900 text-sm">Today, 6:30 PM – 7:30 PM</span>
                 </div>
               </div>
@@ -127,7 +140,7 @@ export default function CustomerActivePickup({
               </div>
               <div>
                 <span className="font-extrabold text-sm text-[#1C1C1E] block">Milestone Unlocked!</span>
-                <span className="text-xs text-stone-500">You earned +10 Green Hero points</span>
+                <span className="text-xs text-stone-500">You earned +{10 * quantity} Green Hero points</span>
               </div>
             </div>
 
@@ -148,7 +161,7 @@ export default function CustomerActivePickup({
                 🏬
               </div>
               <div>
-                <h3 className="font-extrabold text-base text-[#1C1C1E]">Golden Gate Bakery & Cafe</h3>
+                <h3 className="font-extrabold text-base text-[#1C1C1E]">{storeName}</h3>
                 <p className="text-xs text-stone-500">542 Valencia St, San Francisco, CA 94110</p>
               </div>
             </div>
@@ -190,7 +203,7 @@ export default function CustomerActivePickup({
           <div className="bg-white rounded-3xl border border-stone-200/80 p-5 shadow-2xs space-y-3.5">
             <div className="flex items-center justify-between">
               <span className="font-extrabold text-sm text-[#1C1C1E]">Order Summary</span>
-              <span className="text-xs font-semibold text-stone-500">1 Item</span>
+              <span className="text-xs font-semibold text-stone-500">{quantity} Item{quantity > 1 ? 's' : ''}</span>
             </div>
 
             <div className="p-3.5 rounded-2xl bg-stone-50 border border-stone-200/70 flex items-center justify-between">
@@ -201,14 +214,14 @@ export default function CustomerActivePickup({
                   className="w-12 h-12 rounded-xl object-cover"
                 />
                 <div>
-                  <h4 className="font-bold text-xs text-[#1C1C1E]">1× Artisan Pastry & Sourdoug...</h4>
-                  <p className="text-[11px] text-stone-500">Golden Gate Bakery & Cafe</p>
+                  <h4 className="font-bold text-xs text-[#1C1C1E]">{quantity}× Artisan Pastry & Sourdough...</h4>
+                  <p className="text-[11px] text-stone-500">{storeName}</p>
                 </div>
               </div>
 
               <div className="text-right">
-                <span className="font-extrabold text-base text-[#1b5e20] block">$5.90</span>
-                <span className="text-[10px] text-stone-400 line-through">$16.91</span>
+                <span className="font-extrabold text-base text-[#1b5e20] block">${((4.99 * quantity) + 0.49 + (0.42 * quantity)).toFixed(2)}</span>
+                <span className="text-[10px] text-stone-400 line-through">${(16.00 * quantity).toFixed(2)}</span>
               </div>
             </div>
 
@@ -218,7 +231,7 @@ export default function CustomerActivePickup({
                 <Leaf className="w-3.5 h-3.5" />
                 <span>Total Saved</span>
               </span>
-              <span>$11.01 (65% off)</span>
+              <span>${(11.01 * quantity).toFixed(2)} (65% off)</span>
             </div>
 
             {/* Remember Tote Alert */}
