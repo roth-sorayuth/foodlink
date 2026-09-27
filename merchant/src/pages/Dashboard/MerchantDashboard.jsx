@@ -25,7 +25,7 @@ import {
   ShoppingBag,
   Bell
 } from 'lucide-react';
-import { getMerchantListings, verifyOrderPickup } from '../../services/api';
+import { getMerchantListings, verifyOrderPickup, DEFAULT_MERCHANT_LISTINGS } from '../../services/api';
 import { socket } from '../../services/socket';
 
 export default function MerchantDashboard({ onNavigateToProfile, onOpenCreate, onOpenVerify, onEditListing }) {
@@ -122,7 +122,18 @@ export default function MerchantDashboard({ onNavigateToProfile, onOpenCreate, o
   }, []);
 
   // Listings State
-  const [listings, setListings] = useState([]);
+  const [listings, setListings] = useState(() => {
+    try {
+      const stored = localStorage.getItem('foodlink_merchant_listings');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed.map(normalizeDashboardItem);
+        }
+      }
+    } catch (e) {}
+    return DEFAULT_MERCHANT_LISTINGS.map(normalizeDashboardItem);
+  });
 
   // Reservations State
   const [reservations, setReservations] = useState([
