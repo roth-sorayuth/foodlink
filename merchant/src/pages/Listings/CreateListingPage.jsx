@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   ArrowLeft,
   Camera,
@@ -12,10 +12,13 @@ import {
   PiggyBank,
   User,
   Zap,
-  Leaf
+  Leaf,
+  Edit2,
+  RotateCcw,
+  X
 } from 'lucide-react';
 
-import { publishListing } from '../../services/api';
+import { publishListing, updateMerchantListing, getMerchantListings } from '../../services/api';
 
 const CATEGORY_PRESETS = {
   bakery: [
@@ -108,27 +111,113 @@ const CATEGORY_PRESETS = {
   ],
 };
 
-export default function CreateListingPage({ onBack, onSave, onNavigateToProfile }) {
+export default function CreateListingPage({ onBack, onSave, onNavigateToProfile, initialListing = null }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [editingItemId, setEditingItemId] = useState(initialListing?.id || null);
+  const [previousListings, setPreviousListings] = useState([]);
+
   const [photoUrl, setPhotoUrl] = useState(
-    'https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=800&q=80'
+    initialListing?.image || initialListing?.photoUrl || 'https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=800&q=80'
   );
-  const [selectedCategory, setSelectedCategory] = useState('bakery');
-  const [bagName, setBagName] = useState('Artisan Pastry & Sourdough Surprise Bag');
+  const [selectedCategory, setSelectedCategory] = useState(
+    (initialListing?.category || 'bakery').toLowerCase()
+  );
+  const [bagName, setBagName] = useState(
+    initialListing?.title || 'Artisan Pastry & Sourdough Surprise Bag'
+  );
   const [description, setDescription] = useState(
-    "Assortment of today's fresh unsold sourdough loaves, flaky croissants, and daily brioche buns. 100% fresh and edible surplus."
+    initialListing?.description || "Assortment of today's fresh unsold sourdough loaves, flaky croissants, and daily brioche buns. 100% fresh and edible surplus."
   );
-  const [dietaryTags, setDietaryTags] = useState(['vegetarian']);
-  const [bagsAvailable, setBagsAvailable] = useState(10);
-  const [retailValue, setRetailValue] = useState('16.00');
-  const [foodSaverPrice, setFoodSaverPrice] = useState('4.99');
+  const [dietaryTags, setDietaryTags] = useState(
+    initialListing?.dietaryTags || ['vegetarian']
+  );
+  const [bagsAvailable, setBagsAvailable] = useState(
+    initialListing?.bagsAvailable || initialListing?.remainingCount || 10
+  );
+  const [retailValue, setRetailValue] = useState(
+    initialListing?.originalPrice !== undefined
+      ? String(initialListing.originalPrice).replace(/[^0-9.]/g, '')
+      : (initialListing?.originalValue !== undefined ? String(initialListing.originalValue).replace(/[^0-9.]/g, '') : '16.00')
+  );
+  const [foodSaverPrice, setFoodSaverPrice] = useState(
+    initialListing?.price !== undefined
+      ? String(initialListing.price).replace(/[^0-9.]/g, '')
+      : '4.99'
+  );
   const [pickupDate, setPickupDate] = useState('today');
-  const [startTime, setStartTime] = useState('6:30 PM');
-  const [endTime, setEndTime] = useState('7:30 PM');
+  const [startTime, setStartTime] = useState(initialListing?.pickupStart || '6:30 PM');
+  const [endTime, setEndTime] = useState(initialListing?.pickupEnd || '7:30 PM');
   const [presetToast, setPresetToast] = useState(null);
+
+  // When initialListing is passed via props (e.g. clicked pencil on Dashboard or Listings)
+  useEffect(() => {
+    if (initialListing) {
+      handleSelectPrevious(initialListing);
+    }
+  }, [initialListing]);
+
+  // Fetch previous uploaded listings so merchant can easily pick and edit
+  useEffect(() => {
+    async function loadPrevious() {
+      try {
+        const data = await getMerchantListings();
+        if (Array.isArray(data) && data.length > 0) {
+          setPreviousListings(data);
+        }
+      } catch (err) {
+        console.warn('Could not load previous listings:', err);
+      }
+    }
+    loadPrevious();
+  }, []);
+
+  // When merchant chooses any previous uploaded bag
+  const handleSelectPrevious = (prevItem) => {
+    if (!prevItem) return;
+    setEditingItemId(prevItem.id || null);
+    setBagName(prevItem.title || '');
+    setDescription(prevItem.description || '');
+    setPhotoUrl(prevItem.photoUrl || prevItem.image || photoUrl);
+    if (prevItem.category) setSelectedCategory(prevItem.category.toLowerCase());
+    
+    const orig = prevItem.originalPrice !== undefined ? String(prevItem.originalPrice) : (prevItem.originalValue !== undefined ? String(prevItem.originalValue) : '16.00');
+    const prc = prevItem.price !== undefined ? String(prevItem.price) : '4.99';
+    setRetailValue(orig.replace(/[^0-9.]/g, ''));
+    setFoodSaverPrice(prc.replace(/[^0-9.]/g, ''));
+    setBagsAvailable(prevItem.bagsAvailable !== undefined ? prevItem.bagsAvailable : (prevItem.remainingCount || 5));
+    
+    if (prevItem.pickupStart) {
+      setStartTime(prevItem.pickupStart);
+    } else if (prevItem.pickupWindow) {
+      const match = prevItem.pickupWindow.match(/(\d+:\d+\s*[AP]M)\s*[-–]\s*(\d+:\d+\s*[AP]M)/i);
+      if (match) {
+        setStartTime(match[1]);
+        setEndTime(match[2]);
+      }
+    }
+    if (prevItem.pickupEnd) {
+      setEndTime(prevItem.pickupEnd);
+    }
+    if (Array.isArray(prevItem.dietaryTags)) setDietaryTags(prevItem.dietaryTags);
+    
+    setPresetToast(`Loaded "${prevItem.title}" for editing!`);
+    setTimeout(() => setPresetToast(null), 3000);
+  };
+
+  const handleClearToNew = () => {
+    setEditingItemId(null);
+    setBagName('');
+    setDescription('');
+    setRetailValue('15.00');
+    setFoodSaverPrice('4.99');
+    setBagsAvailable(5);
+    setPresetToast('Switched to create new blank bag');
+    setTimeout(() => setPresetToast(null), 2500);
+  };
 
   // Apply a category preset when merchant clicks "+"
   const handleApplyPreset = (preset) => {
+    setEditingItemId(null);
     setBagName(preset.title);
     setDescription(preset.description);
     setRetailValue(preset.retailValue);
@@ -177,14 +266,24 @@ export default function CreateListingPage({ onBack, onSave, onNavigateToProfile 
       };
 
       let result;
-      try {
-        result = await publishListing(payload);
-      } catch (apiErr) {
-        console.warn('Backend API publish error, falling back locally:', apiErr.message);
+      if (editingItemId) {
+        // Update existing listing
+        try {
+          result = await updateMerchantListing(editingItemId, payload);
+        } catch (apiErr) {
+          console.warn('Backend API update error, falling back locally:', apiErr.message);
+        }
+      } else {
+        // Create new listing
+        try {
+          result = await publishListing(payload);
+        } catch (apiErr) {
+          console.warn('Backend API publish error, falling back locally:', apiErr.message);
+        }
       }
 
       const listingForState = {
-        id: result?.listing?.id || `lst-${Date.now()}`,
+        id: editingItemId || result?.listing?.id || `lst-${Date.now()}`,
         title: bagName,
         description,
         image: photoUrl,
@@ -201,9 +300,9 @@ export default function CreateListingPage({ onBack, onSave, onNavigateToProfile 
         raw: result?.listing || payload,
       };
 
-      onSave(listingForState);
+      onSave(listingForState, Boolean(editingItemId));
     } catch (err) {
-      console.error('Failed to publish listing:', err);
+      console.error('Failed to save listing:', err);
     } finally {
       setIsSubmitting(false);
     }
@@ -238,7 +337,7 @@ export default function CreateListingPage({ onBack, onSave, onNavigateToProfile 
             <div className="w-8 h-8 rounded-xl bg-white border border-stone-200/90 overflow-hidden flex items-center justify-center shadow-2xs p-0.5">
               <img src="/cad-bakery-logo.png" alt="CAD Bakery Logo" className="w-full h-full object-contain" />
             </div>
-            <h1 className="font-bold text-base text-[#1C1C1E]">Create Listing</h1>
+            <h1 className="font-bold text-base text-[#1C1C1E]">{editingItemId ? 'Edit Surplus Bag' : 'Create Listing'}</h1>
           </div>
 
           <button
@@ -256,14 +355,107 @@ export default function CreateListingPage({ onBack, onSave, onNavigateToProfile 
         {/* Step Indicator & Auto-saved Badge */}
         <div className="flex items-center justify-between pt-1">
           <div>
-            <span className="text-[10px] font-bold uppercase tracking-wider text-stone-400 block">STEP 1 OF 2</span>
-            <h2 className="text-xl font-extrabold text-[#1C1C1E] tracking-tight">Surplus Bag Details</h2>
+            <span className="text-[10px] font-bold uppercase tracking-wider text-stone-400 block">
+              {editingItemId ? 'EDITING MODE' : 'STEP 1 OF 2'}
+            </span>
+            <h2 className="text-xl font-extrabold text-[#1C1C1E] tracking-tight">
+              {editingItemId ? 'Update Bag Details' : 'Surplus Bag Details'}
+            </h2>
           </div>
           <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-100/80 text-[#2E7D32] border border-emerald-300/40">
             <Check className="w-3 h-3 stroke-[3]" />
-            <span>Draft Auto-saved</span>
+            <span>{editingItemId ? 'Ready to Update' : 'Draft Auto-saved'}</span>
           </span>
         </div>
+
+        {/* Previous Uploaded Items: Quick Edit / Re-List */}
+        {previousListings.length > 0 && (
+          <div className="bg-white rounded-3xl border border-stone-200/90 p-4 sm:p-5 shadow-2xs space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="font-extrabold text-sm text-[#1C1C1E] flex items-center gap-1.5">
+                  <RotateCcw className="w-4 h-4 text-[#2E7D32]" />
+                  <span>Your Previous Uploaded Items</span>
+                </h3>
+                <p className="text-[11px] text-stone-500">
+                  Select any previous bag to edit its price, quantity, or details
+                </p>
+              </div>
+              {editingItemId && (
+                <button
+                  type="button"
+                  onClick={handleClearToNew}
+                  className="px-2.5 py-1 rounded-full bg-stone-100 hover:bg-stone-200 text-stone-700 text-[10px] font-bold transition-colors cursor-pointer"
+                >
+                  Create Blank
+                </button>
+              )}
+            </div>
+
+            {/* Horizontal Scroll of Previous Items */}
+            <div className="flex gap-2.5 overflow-x-auto pb-1 scrollbar-none">
+              {previousListings.map((item) => {
+                const isSelected = editingItemId === item.id;
+                const price = typeof item.price === 'number' ? `$${item.price.toFixed(2)}` : (item.price || '$4.99');
+                const img = item.photoUrl || item.image || 'https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=300&q=80';
+
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => handleSelectPrevious(item)}
+                    className={`flex items-center gap-2.5 p-2 rounded-2xl border text-left shrink-0 transition-all cursor-pointer ${
+                      isSelected
+                        ? 'bg-emerald-50 border-[#2E7D32] ring-2 ring-[#2E7D32]/20 shadow-xs'
+                        : 'bg-stone-50/80 hover:bg-stone-100 border-stone-200/80 text-stone-800'
+                    }`}
+                  >
+                    <img
+                      src={img}
+                      alt={item.title}
+                      className="w-11 h-11 rounded-xl object-cover shrink-0"
+                    />
+                    <div className="min-w-0 pr-1">
+                      <h4 className="font-bold text-xs text-stone-900 truncate max-w-[130px]">
+                        {item.title}
+                      </h4>
+                      <div className="flex items-center gap-1.5 text-[10px] mt-0.5">
+                        <span className="font-extrabold text-[#2E7D32]">{price}</span>
+                        <span className="text-stone-400">•</span>
+                        <span className="text-stone-500 font-semibold">{isSelected ? 'Editing' : 'Tap to Edit'}</span>
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+
+            {editingItemId && (
+              <div className="p-3 rounded-2xl bg-emerald-50 border border-emerald-200/80 flex items-center justify-between text-xs text-[#2E7D32] font-semibold gap-2">
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <Edit2 className="w-4 h-4 shrink-0" />
+                  <span className="truncate">Editing: <strong>{bagName}</strong></span>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingItemId(null);
+                      setPresetToast('Now editing as a new copy (will create new bag)!');
+                      setTimeout(() => setPresetToast(null), 3000);
+                    }}
+                    className="px-2.5 py-1 rounded-lg bg-white border border-emerald-300 text-stone-700 hover:text-black font-bold text-[10px] shadow-2xs hover:bg-emerald-100/50 transition-colors cursor-pointer"
+                  >
+                    Save as New Copy
+                  </button>
+                  <span className="text-[10px] bg-[#2E7D32] text-white px-2 py-0.5 rounded-md font-bold">
+                    Editing Mode
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* 1. Listing Photo Card */}
         <div className="bg-white rounded-3xl border border-stone-200/80 p-4 sm:p-5 shadow-2xs space-y-3">
@@ -714,6 +906,11 @@ export default function CreateListingPage({ onBack, onSave, onNavigateToProfile 
               <>
                 <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                 <span>Publishing to FoodLink network...</span>
+              </>
+            ) : editingItemId ? (
+              <>
+                <Check className="w-4 h-4 stroke-[3]" />
+                <span>Save Changes & Update Bag (${priceNum.toFixed(2)} • {bagsAvailable} bags)</span>
               </>
             ) : (
               <>

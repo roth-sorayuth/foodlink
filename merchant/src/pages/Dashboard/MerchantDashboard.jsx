@@ -28,7 +28,7 @@ import {
 import { getMerchantListings, verifyOrderPickup } from '../../services/api';
 import { socket } from '../../services/socket';
 
-export default function MerchantDashboard({ onNavigateToProfile, onOpenCreate, onOpenVerify }) {
+export default function MerchantDashboard({ onNavigateToProfile, onOpenCreate, onOpenVerify, onEditListing }) {
   // Store Operational State
   const [isOpen, setIsOpen] = useState(true);
   const [acceptingRescues, setAcceptingRescues] = useState(true);
@@ -76,6 +76,7 @@ export default function MerchantDashboard({ onNavigateToProfile, onOpenCreate, o
       totalCount: total,
       claimedPercent,
       progressColor: claimedPercent >= 75 ? 'bg-amber-500' : 'bg-[#2E7D32]',
+      raw: item,
     };
   };
 
@@ -444,7 +445,11 @@ export default function MerchantDashboard({ onNavigateToProfile, onOpenCreate, o
                   <button 
                     onClick={(e) => {
                       e.stopPropagation();
-                      setEditModalItem(item);
+                      if (onEditListing) {
+                        onEditListing(item);
+                      } else {
+                        setEditModalItem(item);
+                      }
                     }}
                     className="absolute bottom-3 right-3 w-9 h-9 rounded-full bg-white text-stone-800 shadow-md flex items-center justify-center hover:bg-stone-50 hover:scale-110 active:scale-95 transition-all cursor-pointer"
                   >

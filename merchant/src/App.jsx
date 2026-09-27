@@ -26,6 +26,7 @@ export default function AdminApp() {
   const [toastMessage, setToastMessage] = useState(null);
   const [hasPendingPickups, setHasPendingPickups] = useState(true);
   const [latestListing, setLatestListing] = useState(null);
+  const [editingListing, setEditingListing] = useState(null);
 
   const showToast = (msg) => {
     setToastMessage(msg);
@@ -38,14 +39,20 @@ export default function AdminApp() {
   if (subView === 'create-listing') {
     return (
       <CreateListingPage
-        onBack={() => setSubView(null)}
-        onSave={(newListing) => {
+        initialListing={editingListing}
+        onBack={() => {
+          setEditingListing(null);
+          setSubView(null);
+        }}
+        onSave={(newListing, isEdit) => {
+          setEditingListing(null);
           setLatestListing(newListing);
           setSubView(null);
           setActiveTab('listings');
-          showToast(`Published "${newListing.title}"!`);
+          showToast(isEdit ? `Updated "${newListing.title}"!` : `Published "${newListing.title}"!`);
         }}
         onNavigateToProfile={() => {
+          setEditingListing(null);
           setSubView(null);
           setActiveTab('profile');
         }}
@@ -164,8 +171,15 @@ export default function AdminApp() {
             {activeTab === 'dashboard' && (
               <MerchantDashboard
                 onNavigateToProfile={() => setActiveTab('profile')}
-                onOpenCreate={() => setSubView('create-listing')}
+                onOpenCreate={() => {
+                  setEditingListing(null);
+                  setSubView('create-listing');
+                }}
                 onOpenVerify={() => setSubView('verify-pickup')}
+                onEditListing={(item) => {
+                  setEditingListing(item.raw || item);
+                  setSubView('create-listing');
+                }}
               />
             )}
 
@@ -173,7 +187,14 @@ export default function AdminApp() {
             {activeTab === 'listings' && (
               <MerchantListings
                 newListing={latestListing}
-                onOpenCreate={() => setSubView('create-listing')}
+                onOpenCreate={() => {
+                  setEditingListing(null);
+                  setSubView('create-listing');
+                }}
+                onEditListing={(item) => {
+                  setEditingListing(item.raw || item);
+                  setSubView('create-listing');
+                }}
                 onNavigateToProfile={() => setActiveTab('profile')}
               />
             )}
