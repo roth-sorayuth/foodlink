@@ -36,25 +36,42 @@ export const CLOUD_DROPS_TOPIC = 'foodlink_cad_live_drops';
  * 3. BroadcastChannel (same-origin browser tabs)
  * 4. LocalStorage (cross-tab fallback)
  */
-export function notifyCustomerNewListing(listing) {
+export function notifyCustomerNewListing(listing, isRestock = false) {
   if (!listing) return;
   const priceNum = typeof listing.price === 'number'
     ? listing.price
     : parseFloat(String(listing.price || '4.99').replace(/[^0-9.]/g, '')) || 4.99;
   
+  const bags = listing.remaining !== undefined ? listing.remaining : (listing.bagsAvailable || 1);
+  const store = listing.storeName || 'CAD Bakery';
+  const title = isRestock ? 'Surplus Food Restocked! 🔥' : 'New Surplus Food Available!';
+  const message = isRestock
+    ? `${store} just restocked "${listing.title}"! (${bags} available for $${priceNum.toFixed(2)})`
+    : `${store} just listed "${listing.title}" for $${priceNum.toFixed(2)}`;
+
   const payload = {
+    isRestocked: isRestock,
     listing: {
       ...listing,
       price: priceNum,
-      storeName: listing.storeName || 'CAD Bakery',
+      storeName: store,
+      bagsAvailable: bags,
+      remaining: bags,
     },
     notification: {
-      id: `notif-${Date.now()}`,
+      id: `notif-${listing.id || Date.now()}`,
       type: 'NEW_LISTING',
-      title: 'New Surplus Food Available!',
-      message: `${listing.storeName || 'CAD Bakery'} just listed "${listing.title}" for $${priceNum.toFixed(2)}`,
+      title,
+      message,
       listingId: listing.id,
-      listing,
+      listing: {
+        ...listing,
+        price: priceNum,
+        storeName: store,
+        bagsAvailable: bags,
+        remaining: bags,
+      },
+      isRead: false,
       createdAt: new Date().toISOString(),
     },
   };
@@ -269,17 +286,17 @@ export async function getMerchantListings() {
   const customItems = getCustomMerchantListings();
   let baseListings = DEFAULT_MERCHANT_LISTINGS;
 
-  // 1. Fetch from backend if available (with strict 1.5s timeout so hosted Vercel never hangs)
+  // 1. Fetch real listings directly from backend database if available
   if (API_BASE_URL) {
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 1500);
+      const timeoutId = setTimeout(() => controller.abort(), 6000);
       const res = await fetch(`${API_BASE_URL}/listings?storeId=st_cad`, { signal: controller.signal });
       clearTimeout(timeoutId);
       if (res.ok) {
         const data = await res.json();
         if (Array.isArray(data) && data.length > 0) {
-          baseListings = data.filter(
+          const dbListings = data.filter(
             (item) =>
               item.storeId === 'st_cad' ||
               item.store?.id === 'st_cad' ||
@@ -287,34 +304,24 @@ export async function getMerchantListings() {
               (item.store?.name && item.store?.name.toLowerCase().includes('cad')) ||
               (item.id && String(item.id).startsWith('cad-'))
           );
+          if (dbListings.length > 0) {
+            return dbListings.sort((a, b) => {
+              const idxA = signatureOrder.indexOf(a.id);
+              const idxB = signatureOrder.indexOf(b.id);
+              if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+              if (idxA !== -1) return -1;
+              if (idxB !== -1) return 1;
+              return 0;
+            });
+          }
         }
       }
     } catch (error) {
-      console.warn('API fetch skipped or timed out, using local/custom data');
+      console.warn('API fetch skipped or timed out, using fallback data');
     }
   }
 
-  // 2. Poll cloud topic for any items published across devices on Vercel
-  try {
-    const cloudRes = await fetch(`https://ntfy.sh/${CLOUD_DROPS_TOPIC}/json?poll=1`);
-    if (cloudRes.ok) {
-      const text = await cloudRes.text();
-      const lines = text.trim().split('\n');
-      for (const line of lines) {
-        try {
-          const parsed = JSON.parse(line);
-          const rawMsg = typeof parsed.message === 'string' ? JSON.parse(parsed.message) : (parsed.message || parsed);
-          const item = rawMsg?.listing || rawMsg;
-          if (item && item.id && !customItems.some((c) => c.id === item.id)) {
-            customItems.push(item);
-            saveCustomMerchantListing(item);
-          }
-        } catch {}
-      }
-    }
-  } catch {}
-
-  // Combine custom items with base items, custom items take precedence at top
+  // Combine custom items with base items fallback
   const allMap = new Map();
   customItems.forEach((it) => allMap.set(it.id, it));
   baseListings.forEach((it) => {
@@ -348,7 +355,7 @@ export async function publishListing(listingData) {
   if (API_BASE_URL) {
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 1500);
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
       const res = await fetch(`${API_BASE_URL}/listings`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -484,6 +491,45 @@ export async function verifyOrderPickup(target) {
     return data;
   } catch (error) {
     console.error('Error verifying pickup:', error);
+    throw error;
+  }
+}
+
+/**
+ * Look up order details by 6-digit pickup code
+ */
+export async function lookupOrder(code) {
+  try {
+    const res = await fetch(`${API_BASE_URL}/orders/lookup?code=${encodeURIComponent(code)}`);
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || 'Order not found');
+    }
+    const data = await res.json();
+    return data.order || data;
+  } catch (error) {
+    console.error('Error looking up order:', error);
+    throw error;
+  }
+}
+
+/**
+ * Place a real customer order directly into the database
+ */
+export async function createRealOrder(orderData) {
+  try {
+    const res = await fetch(`${API_BASE_URL}/orders`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(orderData),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || 'Failed to create order');
+    }
+    return await res.json();
+  } catch (error) {
+    console.error('Error creating real order:', error);
     throw error;
   }
 }

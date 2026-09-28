@@ -56,11 +56,63 @@ io.on('connection', (socket) => {
   });
 
   // Re-broadcast merchant live listing drops to all connected customer clients
-  socket.on('NEW_LISTING_DROPPED', (data) => {
+  socket.on('NEW_LISTING_DROPPED', async (data) => {
     console.log(`[Socket.io] Merchant broadcasted NEW_LISTING_DROPPED: "${data?.listing?.title || 'New Item'}"`);
     io.emit('NEW_LISTING', data);
-    if (data?.notification) {
-      io.emit('NEW_NOTIFICATION', data.notification);
+    const notif = data?.notification;
+    if (notif) {
+      io.emit('NEW_NOTIFICATION', notif);
+      io.emit('NOTIFICATION_RECEIVED', notif);
+
+      // Defensively ensure notification is saved in DB
+      try {
+        const listingId = notif.listingId || data?.listing?.id;
+        const isRestock = Boolean(data?.isRestocked || notif?.title?.includes('Restock') || notif?.message?.includes('restocked'));
+        if (listingId) {
+          const existing = await prisma.notification.findFirst({
+            where: {
+              OR: [
+                { listingId },
+                ...(notif.id ? [{ id: notif.id }] : []),
+              ],
+              type: 'NEW_LISTING',
+            },
+            orderBy: { createdAt: 'desc' },
+          });
+
+          const notifTitle = notif.title || (isRestock ? 'Surplus Food Restocked! 🔥' : 'New Surplus Food Available!');
+          const notifMessage = notif.message || (isRestock
+            ? `${data?.listing?.storeName || 'CAD Bakery'} just restocked "${data?.listing?.title}"!`
+            : `${data?.listing?.storeName || 'CAD Bakery'} just listed "${data?.listing?.title}"`);
+
+          if (existing) {
+            await prisma.notification.update({
+              where: { id: existing.id },
+              data: {
+                title: notifTitle,
+                message: notifMessage,
+                isRead: false,
+                createdAt: new Date(),
+              },
+            });
+            console.log(`[Socket.io] Updated existing single notification card for listing ${listingId}`);
+          } else {
+            await prisma.notification.create({
+              data: {
+                id: notif.id || `notif-${listingId}`,
+                type: 'NEW_LISTING',
+                title: notifTitle,
+                message: notifMessage,
+                listingId,
+                isRead: false,
+              },
+            });
+            console.log(`[Socket.io] Saved ${isRestock ? 'RESTOCK' : 'NEW_LISTING'} notification to DB for listing ${listingId}`);
+          }
+        }
+      } catch (err) {
+        console.warn('Socket NEW_LISTING_DROPPED DB persist notice:', err.message);
+      }
     }
   });
 

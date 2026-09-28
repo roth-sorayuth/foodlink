@@ -20,8 +20,10 @@ import {
   updateMerchantListing,
   deleteMerchantListing,
   getCustomMerchantListings,
+  notifyCustomerNewListing,
   DEFAULT_MERCHANT_LISTINGS
 } from '../../services/api';
+import { socket } from '../../services/socket';
 
 export default function MerchantListings({
   onOpenCreate,
@@ -106,6 +108,33 @@ export default function MerchantListings({
     }
   }, [newListing]);
 
+  // Real-time synchronization when orders are placed or listings are updated
+  useEffect(() => {
+    const handleListingUpdated = (updated) => {
+      if (!updated || !updated.id) return;
+      const normalized = normalizeMerchantItem(updated);
+      setListings((prev) =>
+        prev.map((item) => (item.id === normalized.id ? { ...item, ...normalized } : item))
+      );
+    };
+
+    const handleOrderCreated = (data) => {
+      if (Array.isArray(data?.listings)) {
+        data.listings.forEach(handleListingUpdated);
+      } else if (data?.listing) {
+        handleListingUpdated(data.listing);
+      }
+    };
+
+    socket.on('LISTING_UPDATED', handleListingUpdated);
+    socket.on('ORDER_CREATED', handleOrderCreated);
+
+    return () => {
+      socket.off('LISTING_UPDATED', handleListingUpdated);
+      socket.off('ORDER_CREATED', handleOrderCreated);
+    };
+  }, []);
+
   const updateRemaining = async (id, delta) => {
     const current = listings.find((l) => l.id === id);
     if (!current) return;
@@ -130,16 +159,43 @@ export default function MerchantListings({
       })
     );
 
-    showToast(`Updated "${current.title}" stock to ${nextRemaining}`);
+    const isRestock = delta > 0;
 
-    // Sync to backend DB
+    // Sync to backend DB & broadcast restock notification to customers
     try {
       await updateMerchantListing(id, {
         bagsAvailable: nextRemaining,
         status: nextRemaining === 0 ? 'SOLD_OUT' : 'ACTIVE',
+        restocked: isRestock,
       });
+
+      if (isRestock) {
+        const itemToNotify = {
+          ...(current.raw || {}),
+          ...current,
+          id: current.id,
+          title: current.title,
+          photoUrl: current.photoUrl || current.raw?.photoUrl || current.image,
+          price: typeof current.price === 'number'
+            ? current.price
+            : parseFloat(String(current.price || '4.99').replace(/[^0-9.]/g, '')) || 4.99,
+          originalPrice: typeof current.originalPrice === 'number'
+            ? current.originalPrice
+            : parseFloat(String(current.originalPrice || '12.00').replace(/[^0-9.]/g, '')) || 12.00,
+          discount: current.discount || '50% OFF',
+          bagsAvailable: nextRemaining,
+          remaining: nextRemaining,
+          status: 'ACTIVE',
+          storeName: current.store || current.raw?.storeName || 'CAD Bakery',
+        };
+        notifyCustomerNewListing(itemToNotify, true);
+        showToast(`🔥 Restocked & notified customers! (${nextRemaining} available)`);
+      } else {
+        showToast(`Updated "${current.title}" stock to ${nextRemaining}`);
+      }
     } catch (err) {
       console.error('Failed to sync stock update:', err);
+      showToast(`Updated "${current.title}" stock to ${nextRemaining}`);
     }
   };
 
@@ -167,12 +223,18 @@ export default function MerchantListings({
     showToast(`Relisted "${item.title}" for tomorrow!`);
   };
 
-  const filteredListings = listings.filter((item) => {
-    if (activeFilter === 'active') return true; // Show all items in main management feed; sold out ones appear in black & white
-    if (activeFilter === 'sold-out') return item.remainingCount <= 0;
-    if (activeFilter === 'scheduled') return false;
-    return true;
-  });
+  const filteredListings = listings
+    .filter((item) => {
+      if (activeFilter === 'active') return true; // Show all items in main management feed; sold out ones appear in black & white
+      if (activeFilter === 'sold-out') return item.remainingCount <= 0;
+      if (activeFilter === 'scheduled') return false;
+      return true;
+    })
+    .sort((a, b) => {
+      const qtyA = Number(a.remainingCount ?? a.remaining ?? 0);
+      const qtyB = Number(b.remainingCount ?? b.remaining ?? 0);
+      return qtyB - qtyA; // Highest quantity first
+    });
 
   const activeCount = listings.filter((l) => l.remainingCount > 0 && !l.isPaused).length;
   const soldOutCount = listings.filter((l) => l.remainingCount <= 0).length;
@@ -209,27 +271,6 @@ export default function MerchantListings({
         </button>
       </div>
 
-      {/* Hero Rescue Impact Banner */}
-      <div className="bg-[#EAF7ED] border border-emerald-200/80 rounded-2xl p-4 flex items-center justify-between shadow-2xs">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-[#1b5e20] text-white flex items-center justify-center shrink-0">
-            <Leaf className="w-5 h-5 fill-white/20" />
-          </div>
-          <div>
-            <span className="text-[10px] font-extrabold uppercase tracking-wider text-stone-500 block">
-              TODAY'S RESCUE IMPACT
-            </span>
-            <div className="font-extrabold text-sm text-[#1C1C1E] tracking-tight">
-              24 Bags Rescued • $98.76
-            </div>
-          </div>
-        </div>
-
-        <span className="inline-flex items-center gap-0.5 text-xs font-bold text-[#2E7D32]">
-          <TrendingUp className="w-3.5 h-3.5" />
-          <span>+18%</span>
-        </span>
-      </div>
 
       {/* Filter Tabs */}
       <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs font-semibold scrollbar-none">

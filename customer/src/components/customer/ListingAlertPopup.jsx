@@ -14,6 +14,12 @@ export default function ListingAlertPopup({ alertData, onView, onClose }) {
   const bags = listing?.bagsAvailable || 5;
   const photoUrl = listing?.photoUrl || listing?.image || 'https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=300&q=80';
 
+  const isRestock = Boolean(
+    alertData?.isRestocked ||
+    alertData?.notification?.title?.includes('Restock') ||
+    alertData?.notification?.message?.includes('restocked')
+  );
+
   useEffect(() => {
     // 8-second auto-dismiss with progress countdown
     const duration = 8000;
@@ -37,18 +43,22 @@ export default function ListingAlertPopup({ alertData, onView, onClose }) {
   return (
     <aside 
       aria-label="New Surplus Food Notification"
-      className="fixed bottom-20 sm:bottom-6 right-3 sm:right-6 z-50 max-w-sm sm:max-w-md w-[calc(100vw-24px)] sm:w-auto bg-white/95 backdrop-blur-xl border border-emerald-500/30 rounded-3xl shadow-2xl p-4 transition-all duration-500 animate-in fade-in slide-in-from-bottom-6"
+      className={`fixed bottom-20 sm:bottom-6 right-3 sm:right-6 z-50 max-w-sm sm:max-w-md w-[calc(100vw-24px)] sm:w-auto bg-white/95 backdrop-blur-xl border ${
+        isRestock ? 'border-orange-500/30' : 'border-emerald-500/30'
+      } rounded-3xl shadow-2xl p-4 transition-all duration-500 animate-in fade-in slide-in-from-bottom-6`}
     >
       {/* Top Header Row */}
       <div className="flex items-center justify-between gap-2 pb-2.5 border-b border-stone-100">
         <div className="flex items-center gap-2">
           <span className="relative flex h-2.5 w-2.5">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500" />
+            <span className={`animate-ping absolute inline-flex h-full w-full rounded-full ${isRestock ? 'bg-orange-400' : 'bg-emerald-400'} opacity-75`} />
+            <span className={`relative inline-flex rounded-full h-2.5 w-2.5 ${isRestock ? 'bg-orange-500' : 'bg-emerald-500'}`} />
           </span>
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-black bg-[#EAF7ED] text-[#2E7D32]">
-            <Sparkles className="w-3 h-3 fill-[#2E7D32]" />
-            <span>JUST LISTED SURPLUS</span>
+          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-black ${
+            isRestock ? 'bg-orange-100 text-[#D96B1C]' : 'bg-[#EAF7ED] text-[#2E7D32]'
+          }`}>
+            <Sparkles className={`w-3 h-3 ${isRestock ? 'fill-[#D96B1C]' : 'fill-[#2E7D32]'}`} />
+            <span>{isRestock ? 'SURPLUS RESTOCKED' : 'JUST LISTED SURPLUS'}</span>
           </span>
         </div>
 
@@ -90,11 +100,14 @@ export default function ListingAlertPopup({ alertData, onView, onClose }) {
             {title}
           </h4>
 
-          <div className="flex items-center gap-2 pt-0.5">
+          <div className="flex items-center gap-2 pt-0.5 flex-wrap">
             <span className="font-black text-base text-[#1C1C1E]">{price}</span>
             <span className="text-xs text-stone-400 line-through">{originalPrice}</span>
             <span className="text-[10px] font-extrabold text-[#2E7D32] bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
               {discount}
+            </span>
+            <span className="px-2 py-0.5 rounded-full bg-orange-500 text-white text-[10px] font-bold shadow-xs flex items-center gap-0.5">
+              🔥 {bags <= 2 ? `Only ${bags} left` : `${bags} left`}
             </span>
           </div>
         </div>
@@ -107,10 +120,12 @@ export default function ListingAlertPopup({ alertData, onView, onClose }) {
             onView(listing);
             onClose();
           }}
-          className="flex-1 py-2.5 px-4 rounded-xl bg-[#2E7D32] hover:bg-[#256629] text-white text-xs font-extrabold flex items-center justify-center gap-1.5 shadow-md shadow-emerald-900/10 active:scale-98 transition-all cursor-pointer"
+          className={`flex-1 py-2.5 px-4 rounded-xl ${
+            isRestock ? 'bg-[#D96B1C] hover:bg-[#B85714]' : 'bg-[#2E7D32] hover:bg-[#256629]'
+          } text-white text-xs font-extrabold flex items-center justify-center gap-1.5 shadow-md shadow-emerald-900/10 active:scale-98 transition-all cursor-pointer`}
         >
           <ShoppingBag className="w-3.5 h-3.5" />
-          <span>View & Reserve Bag</span>
+          <span>{isRestock ? 'View Restocked Bag' : 'View & Reserve Bag'}</span>
           <ChevronRight className="w-3.5 h-3.5" />
         </button>
 

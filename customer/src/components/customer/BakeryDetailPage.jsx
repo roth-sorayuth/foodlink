@@ -224,7 +224,7 @@ export default function BakeryDetailPage({
             {/* Profile Avatar */}
             <div className="w-9 h-9 rounded-full overflow-hidden border-2 border-emerald-700/20 cursor-pointer hover:border-emerald-600 transition-colors">
               <img
-                src={currentUser?.avatar || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80"}
+                src={currentUser?.avatar || "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80"}
                 alt="User Profile"
                 className="w-full h-full object-cover"
               />
@@ -285,7 +285,7 @@ export default function BakeryDetailPage({
             </button>
             <div className="w-8 h-8 rounded-full overflow-hidden border border-slate-200">
               <img
-                src={currentUser?.avatar || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80"}
+                src={currentUser?.avatar || "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80"}
                 alt="User profile"
                 className="w-full h-full object-cover"
               />

@@ -24,14 +24,50 @@ export default function CustomerNotificationsModal({
   onMarkAllAsRead,
   onSelectListing,
 }) {
-  const [activeTab, setActiveTab] = useState('all'); // 'all' | 'unread' | 'listings'
+  const [activeTab, setActiveTab] = useState('all'); // 'all' | 'unread'
 
   if (!isOpen) return null;
 
+  // Strictly filter out any order updates, claims, or pickup confirmations
+  const customerFoodNotifications = (notifications || []).filter((item) => {
+    if (!item) return false;
+    // Exclude any order updates, pickup confirmations, or merchant order claims
+    if (item.type && item.type !== 'NEW_LISTING') return false;
+    const title = (item.title || '').toLowerCase();
+    const msg = (item.message || '').toLowerCase();
+    if (title.includes('order') || title.includes('pickup') || title.includes('claim')) return false;
+    if (msg.includes('claimed') || msg.includes('verified') || msg.includes('code:')) return false;
+    return true;
+  });
+
+  // Deduplicate notifications so there is strictly ONE card per food product & sort by quantity descending
+  const deduplicatedNotifications = (() => {
+    const seenListingIds = new Set();
+    const result = [];
+    for (const item of customerFoodNotifications) {
+      const listingId = item.listingId || item.listing?.id;
+      if (listingId) {
+        if (seenListingIds.has(listingId)) continue;
+        seenListingIds.add(listingId);
+      }
+      result.push(item);
+    }
+    return result.sort((a, b) => {
+      const getBags = (notif) => {
+        if (notif.listing?.bagsAvailable !== undefined && notif.listing?.bagsAvailable !== null) return Number(notif.listing.bagsAvailable);
+        if (notif.listing?.remaining !== undefined && notif.listing?.remaining !== null) return Number(notif.listing.remaining);
+        const match = notif.message?.match(/\((\d+)\s*(?:bags|available)/i) || notif.message?.match(/Only\s*(\d+)\s*left/i);
+        return match ? parseInt(match[1], 10) : 0;
+      };
+      return getBags(b) - getBags(a);
+    });
+  })();
+
+  const unreadCountComputed = deduplicatedNotifications.filter((n) => !n.isRead).length;
+
   // Filter notifications based on tab
-  const filteredNotifications = notifications.filter((item) => {
+  const filteredNotifications = deduplicatedNotifications.filter((item) => {
     if (activeTab === 'unread') return !item.isRead;
-    if (activeTab === 'listings') return item.type === 'NEW_LISTING';
     return true;
   });
 
@@ -56,8 +92,10 @@ export default function CustomerNotificationsModal({
     if (!item.isRead && onMarkAsRead) {
       onMarkAsRead(item.id);
     }
-    if (item.listing && onSelectListing) {
-      onSelectListing(item.listing);
+    const targetListing = item.listing;
+
+    if (targetListing && onSelectListing) {
+      onSelectListing(targetListing);
       onClose();
     }
   };
@@ -85,20 +123,20 @@ export default function CustomerNotificationsModal({
                   <h2 className="font-black text-base sm:text-lg text-stone-900 tracking-tight">
                     Notifications
                   </h2>
-                  {unreadCount > 0 && (
+                  {unreadCountComputed > 0 && (
                     <span className="px-2 py-0.5 rounded-full bg-emerald-600 text-white text-[10px] font-black uppercase tracking-wider animate-pulse">
-                      {unreadCount} New
+                      New
                     </span>
                   )}
                 </div>
                 <p className="text-[11px] text-stone-500 font-medium">
-                  Real-time surplus food alerts & order passes
+                  Real-time surplus food alerts & drops
                 </p>
               </div>
             </div>
 
             <div className="flex items-center gap-1.5">
-              {unreadCount > 0 && onMarkAllAsRead && (
+              {unreadCountComputed > 0 && onMarkAllAsRead && (
                 <button
                   onClick={onMarkAllAsRead}
                   className="px-2.5 py-1.5 rounded-xl bg-white border border-stone-200 hover:bg-stone-100 text-stone-700 text-[11px] font-bold flex items-center gap-1 transition-colors cursor-pointer shadow-2xs"
@@ -128,7 +166,7 @@ export default function CustomerNotificationsModal({
                   : 'bg-white border border-stone-200 text-stone-600 hover:bg-stone-100'
               }`}
             >
-              All ({notifications.length})
+              All ({deduplicatedNotifications.length})
             </button>
             <button
               onClick={() => setActiveTab('unread')}
@@ -138,17 +176,7 @@ export default function CustomerNotificationsModal({
                   : 'bg-white border border-stone-200 text-stone-600 hover:bg-stone-100'
               }`}
             >
-              Unread ({unreadCount})
-            </button>
-            <button
-              onClick={() => setActiveTab('listings')}
-              className={`px-3 py-1 rounded-full text-xs font-extrabold transition-all cursor-pointer ${
-                activeTab === 'listings'
-                  ? 'bg-[#2E7D32] text-white shadow-xs'
-                  : 'bg-white border border-stone-200 text-stone-600 hover:bg-stone-100'
-              }`}
-            >
-              Surplus Drops
+              Unread ({unreadCountComputed})
             </button>
           </div>
         </div>
@@ -171,11 +199,21 @@ export default function CustomerNotificationsModal({
             </div>
           ) : (
             filteredNotifications.map((item) => {
-              const isListing = item.type === 'NEW_LISTING';
               const listing = item.listing;
-              const photo = listing?.photoUrl || listing?.image;
-              const price = typeof listing?.price === 'number' ? `$${listing.price.toFixed(2)}` : listing?.price;
-              const origPrice = typeof listing?.originalPrice === 'number' ? `$${listing.originalPrice.toFixed(2)}` : listing?.originalPrice;
+              if (!listing) return null;
+
+              const isRestock = Boolean(item.title?.includes('Restock') || item.message?.includes('restocked'));
+              const photo = listing.photoUrl || listing.image;
+              const priceNum = typeof listing.price === 'number' ? listing.price : parseFloat(listing.price) || 0;
+              const price = `$${priceNum.toFixed(2)}`;
+              const origPrice = listing.originalPrice ? (typeof listing.originalPrice === 'number' ? `$${listing.originalPrice.toFixed(2)}` : listing.originalPrice) : null;
+
+              const bagsCount = listing.bagsAvailable !== undefined
+                ? Number(listing.bagsAvailable)
+                : (listing.remaining !== undefined ? Number(listing.remaining) : 0);
+
+              const isItemSoldOut = bagsCount <= 0 || listing.status === 'SOLD_OUT';
+              const stockBadgeText = isItemSoldOut ? 'Sold Out' : (bagsCount <= 2 ? `Only ${bagsCount} left` : `${bagsCount} left`);
 
               return (
                 <div
@@ -191,42 +229,53 @@ export default function CustomerNotificationsModal({
                     {/* Icon or Store Logo */}
                     <div className="relative shrink-0">
                       {photo ? (
-                        <div className="w-11 h-11 rounded-xl overflow-hidden bg-stone-100 border border-stone-200 shadow-2xs">
+                        <div className="relative w-12 h-12 rounded-xl overflow-hidden bg-stone-100 border border-stone-200 shadow-2xs">
                           <OptimizedImage
                             src={photo}
                             alt=""
-                            width={88}
-                            height={88}
+                            width={96}
+                            height={96}
                             quality={70}
                             className="w-full h-full object-cover"
                             containerClassName="w-full h-full"
                           />
+                          {bagsCount !== null && bagsCount > 0 && (
+                            <span className="absolute bottom-0 inset-x-0 bg-stone-900/80 text-white text-[8px] font-black text-center py-0.5 leading-none">
+                              {bagsCount} left
+                            </span>
+                          )}
                         </div>
                       ) : (
                         <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-                          isListing ? 'bg-emerald-100 text-[#2E7D32]' : 'bg-amber-100 text-amber-700'
+                          isRestock ? 'bg-orange-100 text-[#D96B1C]' : 'bg-emerald-100 text-[#2E7D32]'
                         }`}>
-                          {isListing ? <Sparkles className="w-5 h-5" /> : <ShoppingBag className="w-5 h-5" />}
+                          <Sparkles className="w-5 h-5" />
                         </div>
                       )}
                       {!item.isRead && (
-                        <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-white" />
+                        <span className={`absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full ${isRestock ? 'bg-orange-500' : 'bg-emerald-500'} ring-2 ring-white`} />
                       )}
                     </div>
 
                     {/* Notification Details */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between gap-1">
-                        <span className="text-[10px] font-black uppercase tracking-wider text-emerald-800 flex items-center gap-1">
-                          {isListing ? (
-                            <>
-                              <Sparkles className="w-3 h-3 text-[#2E7D32]" />
-                              <span>JUST LISTED SURPLUS</span>
-                            </>
-                          ) : (
-                            <span>ORDER UPDATE</span>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className={`text-[10px] font-black uppercase tracking-wider flex items-center gap-1 ${
+                            isRestock ? 'text-orange-700' : 'text-emerald-800'
+                          }`}>
+                            <Sparkles className={`w-3 h-3 ${isRestock ? 'fill-[#D96B1C] text-[#D96B1C]' : 'text-[#2E7D32]'}`} />
+                            <span>{isRestock ? 'SURPLUS RESTOCKED' : 'JUST LISTED SURPLUS'}</span>
+                          </span>
+
+                          {/* Orange stock pill badge matching user's request */}
+                          {listing && stockBadgeText && (
+                            <span className="px-2 py-0.5 rounded-full bg-orange-500 text-white text-[10px] font-bold shadow-xs flex items-center gap-0.5">
+                              🔥 {stockBadgeText}
+                            </span>
                           )}
-                        </span>
+                        </div>
+
                         <span className="text-[10px] font-bold text-stone-400 shrink-0">
                           {formatRelativeTime(item.createdAt)}
                         </span>
@@ -242,7 +291,7 @@ export default function CustomerNotificationsModal({
                       {/* Embedded Preview Card if listing is present */}
                       {listing && (
                         <div className="mt-2.5 p-2 rounded-xl bg-white/90 border border-stone-200/80 flex items-center justify-between gap-2 shadow-2xs">
-                          <div className="flex items-center gap-2 min-w-0">
+                          <div className="flex items-center gap-2 min-w-0 flex-wrap">
                             <span className="font-black text-xs text-stone-900">{price || '$4.99'}</span>
                             {origPrice && (
                               <span className="text-[10px] text-stone-400 line-through">{origPrice}</span>
@@ -252,17 +301,29 @@ export default function CustomerNotificationsModal({
                                 {listing.discount}
                               </span>
                             )}
+                            {stockBadgeText && (
+                              <span className={`px-2 py-0.5 rounded-full ${
+                                isItemSoldOut ? 'bg-stone-800 text-stone-300' : 'bg-orange-500 text-white'
+                              } text-[10px] font-bold shadow-xs flex items-center gap-0.5`}>
+                                {isItemSoldOut ? 'Sold Out' : `🔥 ${stockBadgeText}`}
+                              </span>
+                            )}
                           </div>
 
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              handleNotificationClick(item);
+                              if (!isItemSoldOut) handleNotificationClick(item);
                             }}
-                            className="px-3 py-1 rounded-lg bg-[#2E7D32] hover:bg-[#256629] text-white text-[11px] font-extrabold flex items-center gap-1 shadow-2xs transition-transform active:scale-95 cursor-pointer shrink-0"
+                            disabled={isItemSoldOut}
+                            className={`px-3 py-1 rounded-lg ${
+                              isItemSoldOut
+                                ? 'bg-stone-200 text-stone-500 cursor-not-allowed'
+                                : 'bg-[#2E7D32] hover:bg-[#256629] text-white shadow-2xs transition-transform active:scale-95 cursor-pointer'
+                            } text-[11px] font-extrabold flex items-center gap-1 shrink-0`}
                           >
-                            <span>View Bag</span>
-                            <ChevronRight className="w-3 h-3" />
+                            <span>{isItemSoldOut ? 'Sold Out' : 'View Bag'}</span>
+                            {!isItemSoldOut && <ChevronRight className="w-3 h-3" />}
                           </button>
                         </div>
                       )}

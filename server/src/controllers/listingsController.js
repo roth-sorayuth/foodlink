@@ -261,26 +261,19 @@ export async function getListings(req, res) {
 
     const listings = await prisma.listing.findMany({
       where,
-      orderBy: { createdAt: 'desc' },
+      orderBy: [
+        { bagsAvailable: 'desc' },
+        { createdAt: 'desc' },
+      ],
       include: { store: true },
     });
 
-    return res.json(listings.length > 0 ? listings : FALLBACK_LISTINGS);
-  } catch (error) {
-    console.warn('Database unavailable, returning fallback listings:', error.message);
-    let results = [...FALLBACK_LISTINGS];
-    const { category, search, storeId } = req.query;
-    if (storeId) {
-      results = results.filter(l => l.storeId === storeId || l.store?.id === storeId || (l.storeName && l.storeName.toLowerCase().includes('cad')));
-    }
-    if (category && category !== 'all') {
-      results = results.filter(l => l.category?.toLowerCase() === category.toLowerCase());
-    }
-    if (search) {
-      const q = search.toLowerCase();
-      results = results.filter(l => l.title?.toLowerCase().includes(q) || l.storeName?.toLowerCase().includes(q));
-    }
+    const results = [...listings];
+    results.sort((a, b) => (Number(b.bagsAvailable) || 0) - (Number(a.bagsAvailable) || 0));
     return res.json(results);
+  } catch (error) {
+    console.warn('Database error in getListings:', error.message);
+    return res.json([]);
   }
 }
 
@@ -450,6 +443,7 @@ export async function createListing(req, res) {
         notification: enrichedNotification,
       });
       io.emit('NOTIFICATION_RECEIVED', enrichedNotification);
+      io.emit('NEW_NOTIFICATION', enrichedNotification);
       console.log(`[Socket.io] Broadcasted NEW_LISTING: "${savedListing.title}"`);
     }
 
@@ -483,11 +477,16 @@ export async function updateListing(req, res) {
     }
     if (updateData.bagsSold !== undefined) updateData.bagsSold = parseInt(updateData.bagsSold, 10);
 
+    const isRestocked = Boolean(updateData.restocked || updateData.isRestocked);
+    delete updateData.restocked;
+    delete updateData.isRestocked;
+
     let updatedListing;
     try {
       updatedListing = await prisma.listing.update({
         where: { id },
         data: updateData,
+        include: { store: true },
       });
     } catch (dbErr) {
       console.warn('DB update failed, updating in-memory fallback:', dbErr.message);
@@ -503,6 +502,71 @@ export async function updateListing(req, res) {
     const io = req.app.get('io');
     if (io) {
       io.emit('LISTING_UPDATED', updatedListing);
+
+      if (isRestocked) {
+        const notifTitle = 'Surplus Food Restocked! 🔥';
+        const store = updatedListing.storeName || updatedListing.store?.name || 'CAD Bakery';
+        const priceNum = typeof updatedListing.price === 'number' ? updatedListing.price : parseFloat(updatedListing.price) || 4.99;
+        const notifMessage = `${store} just restocked "${updatedListing.title}"! (${updatedListing.bagsAvailable} bags available for $${priceNum.toFixed(2)})`;
+
+        let notifRecord;
+        try {
+          const existingNotif = await prisma.notification.findFirst({
+            where: {
+              listingId: updatedListing.id,
+              type: 'NEW_LISTING',
+            },
+            orderBy: { createdAt: 'desc' },
+          });
+
+          if (existingNotif) {
+            notifRecord = await prisma.notification.update({
+              where: { id: existingNotif.id },
+              data: {
+                title: notifTitle,
+                message: notifMessage,
+                isRead: false,
+                createdAt: new Date(),
+              },
+            });
+            console.log(`[DB] Updated existing notification card for "${updatedListing.title}" with new stock (${updatedListing.bagsAvailable} bags)`);
+          } else {
+            notifRecord = await prisma.notification.create({
+              data: {
+                type: 'NEW_LISTING',
+                title: notifTitle,
+                message: notifMessage,
+                listingId: updatedListing.id,
+                isRead: false,
+              },
+            });
+          }
+        } catch (err) {
+          notifRecord = {
+            id: `notif-${updatedListing.id}`,
+            type: 'NEW_LISTING',
+            title: notifTitle,
+            message: notifMessage,
+            listingId: updatedListing.id,
+            isRead: false,
+            createdAt: new Date().toISOString(),
+          };
+        }
+
+        const enrichedNotif = {
+          ...notifRecord,
+          listing: updatedListing,
+        };
+
+        io.emit('NEW_LISTING', {
+          listing: updatedListing,
+          notification: enrichedNotif,
+          isRestocked: true,
+        });
+        io.emit('NOTIFICATION_RECEIVED', enrichedNotif);
+        io.emit('NEW_NOTIFICATION', enrichedNotif);
+        console.log(`[Socket.io] Broadcasted restock notification for "${updatedListing.title}" (${updatedListing.bagsAvailable} bags)`);
+      }
     }
 
     return res.json({ success: true, listing: updatedListing });

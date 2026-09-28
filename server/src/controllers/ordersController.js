@@ -242,6 +242,47 @@ export async function createOrder(req, res) {
         listing: updatedListings[0],
         notification: merchantNotification,
       });
+
+      // Broadcast LISTING_UPDATED for every updated listing & update corresponding notification card
+      for (const updatedListing of updatedListings) {
+        io.emit('LISTING_UPDATED', updatedListing);
+
+        try {
+          const existingNotif = await prisma.notification.findFirst({
+            where: { listingId: updatedListing.id, type: 'NEW_LISTING' },
+            orderBy: { createdAt: 'desc' },
+          });
+
+          if (existingNotif) {
+            const store = updatedListing.storeName || 'CAD Bakery';
+            const priceNum = typeof updatedListing.price === 'number' ? updatedListing.price : parseFloat(updatedListing.price) || 4.99;
+            const remaining = updatedListing.bagsAvailable;
+            const isSoldOut = remaining <= 0;
+            const notifTitle = isSoldOut ? 'Surplus Item Sold Out' : (existingNotif.title || 'Surplus Food Available');
+            const notifMessage = isSoldOut
+              ? `${store}'s "${updatedListing.title}" is now Sold Out!`
+              : `${store} has "${updatedListing.title}" (${remaining} available for $${priceNum.toFixed(2)})`;
+
+            const updatedNotif = await prisma.notification.update({
+              where: { id: existingNotif.id },
+              data: {
+                title: notifTitle,
+                message: notifMessage,
+              },
+            });
+
+            const enriched = {
+              ...updatedNotif,
+              listing: updatedListing,
+            };
+            io.emit('NOTIFICATION_RECEIVED', enriched);
+            io.emit('NEW_NOTIFICATION', enriched);
+          }
+        } catch (err) {
+          console.warn('Error updating listing notification on order:', err.message);
+        }
+      }
+
       console.log(`[Socket.io] Broadcasted ORDER_CREATED: ${order.orderNumber} (Code: ${pickupCode}) by ${customerUser.name}`);
     }
 
@@ -300,8 +341,17 @@ export async function verifyPickup(req, res) {
       return res.status(404).json({ error: `No active order found with code "${code || orderId}"` });
     }
 
-    // Return immediately if already completed
+    // Return immediately if already completed, ensuring socket sync
     if (order.status === 'COMPLETED') {
+      const io = req.app.get('io');
+      if (io) {
+        io.emit('PICKUP_VERIFIED', {
+          orderId: order.id,
+          orderNumber: order.orderNumber,
+          pickupCode: order.pickupCode,
+          verifiedAt: order.verifiedAt || new Date(),
+        });
+      }
       return res.json({
         success: true,
         message: 'Order already verified!',
@@ -312,7 +362,7 @@ export async function verifyPickup(req, res) {
     const listingTitle = order.listing?.title || 'Surplus Food Bag';
     const storeName = order.store?.name || 'Store';
 
-    // 3. Mark as COMPLETED & safely update user stats
+    // 3. Mark as COMPLETED, mark notifications read & safely update user stats
     const txOps = [
       prisma.order.update({
         where: { id: order.id },
@@ -321,6 +371,10 @@ export async function verifyPickup(req, res) {
           verifiedAt: new Date(),
         },
         include: { listing: true, user: true, store: true },
+      }),
+      prisma.notification.updateMany({
+        where: { orderId: order.id },
+        data: { isRead: true },
       }),
     ];
 
@@ -332,18 +386,6 @@ export async function verifyPickup(req, res) {
             mealsRescued: { increment: order.quantity || 1 },
             co2SavedKg: { increment: order.co2SavedKg || 1.2 },
             moneySaved: { increment: order.moneySaved || 5 },
-          },
-        })
-      );
-
-      txOps.push(
-        prisma.notification.create({
-          data: {
-            type: 'PICKUP_VERIFIED',
-            title: 'Pickup Confirmed! 🎉',
-            message: `Your pickup for ${listingTitle} at ${storeName} was successfully verified!`,
-            orderId: order.id,
-            userId: order.userId,
           },
         })
       );
@@ -371,5 +413,50 @@ export async function verifyPickup(req, res) {
   } catch (error) {
     console.error('Error verifying pickup:', error);
     return res.status(500).json({ error: 'Failed to verify pickup', details: error.message });
+  }
+}
+
+/**
+ * GET /api/orders/lookup
+ * Look up order details by 6-digit pickup code or orderNumber
+ */
+export async function lookupOrder(req, res) {
+  try {
+    const { code, orderId } = req.query;
+
+    let order = null;
+
+    if (orderId) {
+      order = await prisma.order.findUnique({
+        where: { id: orderId },
+        include: { listing: true, user: true, store: true },
+      });
+    }
+
+    if (!order && code) {
+      const cleanCode = String(code).trim().toUpperCase();
+      order = await prisma.order.findFirst({
+        where: {
+          OR: [
+            { pickupCode: cleanCode },
+            { orderNumber: cleanCode },
+            { orderNumber: `#FS-${cleanCode}` },
+            { orderNumber: cleanCode.startsWith('#') ? cleanCode : `#${cleanCode}` },
+            { pickupCode: `SAVER-${cleanCode}` },
+            { pickupCode: cleanCode.replace(/^#?FS-?/i, '') },
+          ],
+        },
+        include: { listing: true, user: true, store: true },
+      });
+    }
+
+    if (!order) {
+      return res.status(404).json({ error: `No order found with code "${code || orderId}"` });
+    }
+
+    return res.json({ success: true, order });
+  } catch (error) {
+    console.error('Error looking up order:', error);
+    return res.status(500).json({ error: 'Failed to look up order', details: error.message });
   }
 }

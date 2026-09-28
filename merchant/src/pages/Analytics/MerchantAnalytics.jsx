@@ -118,52 +118,7 @@ export default function MerchantAnalytics({ onNavigateToProfile }) {
 
       </div>
 
-      {/* Certified Eco Partner Hero Card */}
-      <div className="bg-gradient-to-br from-[#1b5e20] via-[#236e29] to-[#144919] rounded-3xl p-5 text-white shadow-xs relative overflow-hidden space-y-4">
-        {/* Soft radial glow */}
-        <div className="absolute top-0 right-0 w-48 h-48 bg-white/10 rounded-full blur-2xl pointer-events-none" />
 
-        <div className="flex items-center justify-between relative z-10">
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-white/20 text-white backdrop-blur-xs">
-            <Leaf className="w-3 h-3" /> CERTIFIED ECO PARTNER • TIER 1
-          </span>
-          <div className="w-7 h-7 rounded-full bg-white/15 flex items-center justify-center text-white">
-            🍃
-          </div>
-        </div>
-
-        <div className="relative z-10 space-y-1">
-          <div className="text-3xl font-black tracking-tight text-white">
-            215 <span className="text-lg font-bold">kg Diverted</span>
-          </div>
-          <p className="text-xs text-white/80 leading-relaxed max-w-sm">
-            Surplus bread, viennoiserie, and baked goods kept from landfill
-          </p>
-        </div>
-
-        {/* 2 Metric Blocks */}
-        <div className="grid grid-cols-2 gap-2.5 relative z-10 pt-1">
-          <div className="p-3 rounded-2xl bg-white/15 backdrop-blur-xs flex items-center gap-3">
-            <div className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center text-white shrink-0">
-              <Cloud className="w-4 h-4" />
-            </div>
-            <div>
-              <span className="font-extrabold text-sm text-white block">537 kg CO₂e</span>
-              <span className="text-[10px] text-white/70 block leading-tight">Greenhouse gas averted</span>
-            </div>
-          </div>
-
-          <div className="p-3 rounded-2xl bg-white/15 backdrop-blur-xs flex items-center gap-3">
-            <div className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center text-white shrink-0">
-              <Utensils className="w-4 h-4" />
-            </div>
-            <div>
-              <span className="font-extrabold text-sm text-white block">180 Meals</span>
-              <span className="text-[10px] text-white/70 block leading-tight">Provided to locals</span>
-            </div>
-          </div>
-        </div>
-      </div>
 
       {/* Weekly Rescue Volume (Bar Chart) */}
       <div className="bg-white rounded-3xl border border-stone-200/80 p-4 sm:p-5 shadow-2xs space-y-3.5">

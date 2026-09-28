@@ -25,7 +25,13 @@ import {
   ShoppingBag,
   Bell
 } from 'lucide-react';
-import { getMerchantListings, updateMerchantListing, verifyOrderPickup, DEFAULT_MERCHANT_LISTINGS } from '../../services/api';
+import {
+  getMerchantListings,
+  updateMerchantListing,
+  verifyOrderPickup,
+  notifyCustomerNewListing,
+  DEFAULT_MERCHANT_LISTINGS
+} from '../../services/api';
 import { socket } from '../../services/socket';
 
 export default function MerchantDashboard({ onNavigateToProfile, onOpenCreate, onOpenVerify, onEditListing, newListing, onNavigateToListings }) {
@@ -131,8 +137,11 @@ export default function MerchantDashboard({ onNavigateToProfile, onOpenCreate, o
       })
     );
 
-    showToast(`Updated "${editModalItem.title}" stock to ${count}!`);
+    const prevBags = Number(editModalItem.remaining || editModalItem.bagsAvailable || 0);
+    const isRestock = count > prevBags;
+    showToast(isRestock ? `🔥 Restocked & notified customers (${count} bags)!` : `Updated "${editModalItem.title}" stock to ${count}!`);
     const idToUpdate = editModalItem.id;
+    const itemSnapshot = { ...editModalItem };
     setEditModalItem(null);
 
     try {
@@ -140,7 +149,20 @@ export default function MerchantDashboard({ onNavigateToProfile, onOpenCreate, o
         bagsAvailable: count,
         price: priceVal,
         status: count > 0 ? 'ACTIVE' : 'SOLD_OUT',
+        restocked: isRestock,
       });
+
+      if (isRestock) {
+        notifyCustomerNewListing({
+          ...itemSnapshot,
+          id: idToUpdate,
+          title: itemSnapshot.title,
+          price: priceVal,
+          bagsAvailable: count,
+          remaining: count,
+          storeName: itemSnapshot.store || 'CAD Bakery',
+        }, true);
+      }
     } catch (err) {
       console.error('Failed to sync edit listing:', err);
     }

@@ -37,6 +37,7 @@ export default function AdminApp() {
   const [isOpen, setIsOpen] = useState(true);
   const [toastMessage, setToastMessage] = useState(null);
   const [hasPendingPickups, setHasPendingPickups] = useState(true);
+  const [refreshTrigger, setRefreshTrigger] = useState(null);
   const [latestListing, setLatestListing] = useState(null);
   const [editingListing, setEditingListing] = useState(null);
 
@@ -149,6 +150,7 @@ export default function AdminApp() {
           <div className="flex items-center gap-2">
             <OrderNotificationMenu
               hasPendingPickups={hasPendingPickups}
+              refreshTrigger={refreshTrigger}
               onNavigateToOrders={() => {
                 setSubView(null);
                 setActiveTab('orders');
@@ -179,6 +181,7 @@ export default function AdminApp() {
                 setSubView(null);
                 setVerificationCode(null);
                 setHasPendingPickups(false);
+                setRefreshTrigger(Date.now());
               }}
             />
           ) : (

@@ -486,45 +486,7 @@ export default function MerchantProfile({ onNavigateToDashboard }) {
 
         </section>
 
-        {/* Milestone Banner (Tree Planter) */}
-        <section className="bg-white rounded-2xl border border-stone-200/80 p-5 sm:p-6 shadow-xs space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-[#2E7D32] flex items-center justify-center text-white shrink-0 shadow-xs">
-                <Sprout className="w-5 h-5" />
-              </div>
-              <div>
-                <h3 className="font-bold text-sm sm:text-base text-[#1C1C1E]">Tree Planter Milestone</h3>
-                <p className="text-xs text-stone-500">Just 2 meals away from unlocking your Golden Sprout Badge!</p>
-              </div>
-            </div>
-            <div className="text-left sm:text-right">
-              <span className="font-bold text-sm text-[#1C1C1E]">28 / 30 Meals</span>
-              <span className="text-xs font-semibold text-[#2E7D32] ml-1.5">(93%)</span>
-            </div>
-          </div>
 
-          {/* Large Progress Bar */}
-          <div className="w-full h-3 bg-stone-100 rounded-full overflow-hidden">
-            <div className="h-full bg-[#2E7D32] rounded-full w-[93%] transition-all duration-700 ease-out" />
-          </div>
-
-          {/* Level Markers */}
-          <div className="flex items-center justify-between text-xs pt-1">
-            <div className="flex items-center gap-1.5 text-[#2E7D32] font-semibold">
-              <CheckCircle2 className="w-3.5 h-3.5" />
-              <span>Level 2: Seedling (15)</span>
-            </div>
-            <div className="flex items-center gap-1.5 text-[#2E7D32] font-bold">
-              <Sprout className="w-3.5 h-3.5" />
-              <span>Level 3: Sapling (25)</span>
-            </div>
-            <div className="flex items-center gap-1.5 text-stone-400 font-medium">
-              <Lock className="w-3.5 h-3.5" />
-              <span>Level 4: Ancient Oak (50)</span>
-            </div>
-          </div>
-        </section>
 
         {/* Main 2-Column Responsive Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
@@ -681,45 +643,7 @@ export default function MerchantProfile({ onNavigateToDashboard }) {
           {/* ======================================================== */}
           <div className="space-y-4">
             
-            {/* Card 1: Official Rescue Certificate */}
-            <div className="bg-white rounded-2xl border border-stone-200/80 p-5 shadow-xs space-y-4 relative overflow-hidden">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <ShieldCheck className="w-5 h-5 text-[#2E7D32]" />
-                  <h3 className="font-bold text-sm text-[#1C1C1E]">Rescue Certificate</h3>
-                </div>
-                <span className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-md bg-stone-100 text-stone-600 border border-stone-200">
-                  Official 2024
-                </span>
-              </div>
 
-              {/* Certificate Inner Preview */}
-              <div className="p-4 rounded-xl bg-[#FFF8F0]/70 border border-amber-200/60 space-y-2">
-                <div className="flex items-center justify-between text-[10px] text-[#2E7D32] font-semibold uppercase tracking-wider">
-                  <span className="inline-flex items-center gap-1">
-                    <Leaf className="w-3 h-3" /> FOODSAVER OFFICIAL REGISTRY
-                  </span>
-                  <span className="text-stone-500 font-mono">ID: #FS-CA-2490</span>
-                </div>
-                <h4 className="font-bold text-sm text-[#1C1C1E]">CAD Bakery</h4>
-                <p className="text-[11px] text-stone-500">Validated Environmental Contribution:</p>
-                <div className="text-lg font-extrabold text-[#2E7D32] tracking-tight">
-                  70.0 kg CO₂e Diverted
-                </div>
-                <div className="flex items-center justify-between text-[10px] text-stone-500 pt-1 border-t border-amber-200/40">
-                  <span>San Francisco Bay Area</span>
-                  <span className="font-mono">SHA256: 9b2d...f7</span>
-                </div>
-              </div>
-
-              <button 
-                onClick={() => setShowCertificateModal(true)}
-                className="w-full py-2.5 rounded-xl bg-[#2E7D32] hover:bg-[#256629] text-white text-xs font-semibold flex items-center justify-center gap-2 shadow-xs transition-all active:scale-[0.98]"
-              >
-                <Download className="w-4 h-4" />
-                <span>Download Certificate PDF</span>
-              </button>
-            </div>
 
             {/* Card 2: Rescue Preferences */}
             <div className="bg-white rounded-2xl border border-stone-200/80 p-5 shadow-xs space-y-4">
@@ -972,63 +896,7 @@ export default function MerchantProfile({ onNavigateToDashboard }) {
         </div>
       </footer>
 
-      {/* ======================================================== */}
-      {/* MODAL 1: Official Certificate PDF Preview Modal          */}
-      {/* ======================================================== */}
-      {showCertificateModal && (
-        <div className="fixed inset-0 z-50 bg-stone-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-8 space-y-6 shadow-2xl border border-stone-200 animate-in fade-in zoom-in-95">
-            <div className="flex items-center justify-between border-b border-stone-100 pb-4">
-              <div className="flex items-center gap-2">
-                <ShieldCheck className="w-5 h-5 text-[#2E7D32]" />
-                <h3 className="font-bold text-base text-[#1C1C1E]">Official 2024 Impact Certificate</h3>
-              </div>
-              <button 
-                onClick={() => setShowCertificateModal(false)}
-                className="w-8 h-8 rounded-full bg-stone-100 hover:bg-stone-200 flex items-center justify-center text-stone-500"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
 
-            {/* Certificate Canvas Graphic */}
-            <div className="p-6 rounded-2xl bg-gradient-to-b from-[#FFF8F0] to-white border-2 border-[#2E7D32]/30 text-center space-y-3 relative overflow-hidden">
-              <div className="w-12 h-12 rounded-2xl bg-[#2E7D32]/10 text-[#2E7D32] flex items-center justify-center mx-auto">
-                <Leaf className="w-6 h-6" />
-              </div>
-              <h4 className="font-extrabold text-xl text-[#1C1C1E]">Certificate of Food Rescue Excellence</h4>
-              <p className="text-xs text-stone-500">This certifies that</p>
-              <p className="text-lg font-bold text-[#2E7D32]">CAD Bakery</p>
-              <p className="text-xs text-stone-600 max-w-xs mx-auto">
-                has successfully diverted <strong>70.0 kg of CO₂e</strong> and saved <strong>28 fresh surplus meal bags</strong> from urban waste streams.
-              </p>
-              <div className="pt-4 border-t border-amber-200/50 flex items-center justify-between text-[10px] text-stone-400 font-mono">
-                <span>REGISTRY #FS-CA-2490</span>
-                <span>VERIFIED 2024</span>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3">
-              <button 
-                onClick={() => {
-                  setShowCertificateModal(false);
-                  showToast('Official PDF Certificate downloaded to your device!');
-                }}
-                className="flex-1 py-3 rounded-xl bg-[#2E7D32] hover:bg-[#256629] text-white text-xs font-semibold flex items-center justify-center gap-2 shadow-xs transition-colors"
-              >
-                <Download className="w-4 h-4" />
-                <span>Save PDF Certificate</span>
-              </button>
-              <button 
-                onClick={() => setShowCertificateModal(false)}
-                className="px-5 py-3 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-semibold"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* ======================================================== */}
       {/* MODAL 2: Receipt View Modal                             */}

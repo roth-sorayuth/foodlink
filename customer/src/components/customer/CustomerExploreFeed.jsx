@@ -93,217 +93,20 @@ export default function CustomerExploreFeed({
     };
   };
 
-  // Curated demo listings highlighting CAD Bakery for demo
-  const fallbackListings = [
-    {
-      id: 'cad-sourdough-box',
-      store: 'CAD Bakery',
-      storeLogo: '/cad-bakery-logo.png',
-      title: 'Artisan Sourdough & Croissant Surprise Box',
-      image: 'https://images.unsplash.com/photo-1555507036-ab1f4038808a?auto=format&fit=crop&w=480&q=70',
-      rating: '4.9',
-      distance: '0.4 km',
-      pickupTime: '6:30 PM–7:30 PM',
-      address: '422 St 178, Daun Penh',
-      price: '$4.99',
-      originalPrice: '$16.00',
-      remaining: 4,
-      bagsAvailable: 4,
-      isAvailable: true,
-      status: 'ACTIVE',
-      category: 'Pastry',
-      description: 'Artisanal European sourdough loaves, buttery croissants, and morning viennoiserie baked fresh today.',
-    },
-    {
-      id: 'cad-croissant-bundle',
-      store: 'CAD Bakery',
-      storeLogo: '/cad-bakery-logo.png',
-      title: 'French Butter Croissant & Viennoiserie Bag',
-      image: 'https://images.unsplash.com/photo-1549931319-a545dcf3bc73?auto=format&fit=crop&w=480&q=70',
-      rating: '4.9',
-      distance: '0.4 km',
-      pickupTime: '6:00 PM–7:30 PM',
-      address: '422 St 178, Daun Penh',
-      price: '$3.99',
-      originalPrice: '$13.50',
-      remaining: 5,
-      bagsAvailable: 5,
-      isAvailable: true,
-      status: 'ACTIVE',
-      category: 'Pastry',
-      description: 'Pure French butter croissants, almond escargot pastries, chocolate swirls, and brioche rolls.',
-    },
-    {
-      id: 'cad-rustic-breads',
-      store: 'CAD Bakery',
-      storeLogo: '/cad-bakery-logo.png',
-      title: 'Rustic Country Sourdough & Baguette Pack',
-      image: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=480&q=70',
-      rating: '4.9',
-      distance: '0.4 km',
-      pickupTime: '6:30 PM–8:00 PM',
-      address: '422 St 178, Daun Penh',
-      price: '$3.50',
-      originalPrice: '$12.00',
-      remaining: 3,
-      bagsAvailable: 3,
-      isAvailable: true,
-      status: 'ACTIVE',
-      category: 'Pastry',
-      description: 'Two full-size artisan sourdough boules and crispy European baguettes freshly baked with organic wheat flour.',
-    },
-    {
-      id: 'cad-sweet-dessert-box',
-      store: 'CAD Bakery',
-      storeLogo: '/cad-bakery-logo.png',
-      title: 'Sweet Tartlets, Cakes & Danish Treats',
-      image: 'https://images.unsplash.com/photo-1578985545062-69928b1d9587?auto=format&fit=crop&w=480&q=70',
-      rating: '4.9',
-      distance: '0.4 km',
-      pickupTime: '7:00 PM–8:30 PM',
-      address: '422 St 178, Daun Penh',
-      price: '$4.50',
-      originalPrice: '$15.00',
-      remaining: 3,
-      bagsAvailable: 3,
-      isAvailable: true,
-      status: 'ACTIVE',
-      category: 'Dessert',
-      description: 'Fresh fruit tarts, custard brioches, cinnamon glazed knots, and seasonal pastry slices from today.',
-    },
-    {
-      id: 'cad-savory-focaccia',
-      store: 'CAD Bakery',
-      storeLogo: '/cad-bakery-logo.png',
-      title: 'Savory Focaccia & Stuffed Brioche Box',
-      image: 'https://images.unsplash.com/photo-1528735602780-2552fd46c7af?auto=format&fit=crop&w=480&q=70',
-      rating: '4.9',
-      distance: '0.4 km',
-      pickupTime: '6:00 PM–7:30 PM',
-      address: '422 St 178, Daun Penh',
-      price: '$4.20',
-      originalPrice: '$14.00',
-      remaining: 2,
-      bagsAvailable: 2,
-      isAvailable: true,
-      status: 'ACTIVE',
-      category: 'Food',
-      description: 'Rosemary sea salt focaccia squares, ham and gruyere melt twists, and savory olive rolls.',
-    },
-    {
-      id: 'cad-coffee-pastry-pair',
-      store: 'CAD Bakery',
-      storeLogo: '/cad-bakery-logo.png',
-      title: 'Barista Cold Brew & Afternoon Pastry Pair',
-      image: 'https://images.unsplash.com/photo-1517256064527-09c73fc73e38?auto=format&fit=crop&w=480&q=70',
-      rating: '4.9',
-      distance: '0.4 km',
-      pickupTime: '5:30 PM–7:00 PM',
-      address: '422 St 178, Daun Penh',
-      price: '$2.90',
-      originalPrice: '$9.00',
-      remaining: 6,
-      bagsAvailable: 6,
-      isAvailable: true,
-      status: 'ACTIVE',
-      category: 'Drinks',
-      description: 'Bottled organic cold brew coffee or iced matcha latte paired with two fresh breakfast pastries.',
-    },
-    {
-      id: 'mori-bistro',
-      store: 'Mori Bistro',
-      title: 'Japanese Donburi & Bento Surprise Bag',
-      image: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=480&q=70',
-      rating: '4.7',
-      distance: '1.7 km',
-      pickupTime: '10:00 AM–9:00 PM',
-      address: '58 Street R8, Daun Penh',
-      price: '$1.80',
-      originalPrice: '$3.60',
-      remaining: 3,
-      bagsAvailable: 3,
-      isAvailable: true,
-      status: 'ACTIVE',
-      category: 'Food',
-      description: 'Fresh teriyaki chicken, katsu curry, or daily sushi roll surplus prepared today.',
-    },
-    {
-      id: 'aus-bake',
-      store: 'AusBake Pastries',
-      title: 'Baking Pastries in Cambodia Since 2003',
-      image: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=480&q=70',
-      rating: '4.8',
-      distance: '2.1 km',
-      pickupTime: '11:00 AM–8:30 PM',
-      address: '32 St 113, Boeng Keng Kang',
-      price: '$2.50',
-      originalPrice: '$5.00',
-      remaining: 5,
-      bagsAvailable: 5,
-      isAvailable: true,
-      status: 'ACTIVE',
-      category: 'Pastry',
-      description: 'Assortment of fresh meat pies, sausage rolls, spinach feta parcels and sweet danishes.',
-    },
-    {
-      id: 'green-earth',
-      store: 'Green Earth Grocers',
-      title: 'Fresh Organic Produce & Dairy Box',
-      image: 'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=480&q=70',
-      rating: '4.8',
-      distance: '0.8 km',
-      pickupTime: '7:00 PM–8:30 PM',
-      address: '890 Market St, Tuol Kouk',
-      price: '$6.50',
-      originalPrice: '$22.00',
-      remaining: 2,
-      bagsAvailable: 2,
-      isAvailable: true,
-      status: 'ACTIVE',
-      category: 'Healthy',
-      description: 'Assorted seasonal organic vegetables, fruit basket, and dairy surplus items.',
-    },
-    {
-      id: 'java-creative-cafe',
-      store: 'Java Creative Cafe',
-      title: 'Artisan Bakery & Filter Coffee Bundle',
-      image: 'https://images.unsplash.com/photo-1554118811-1e0d58224f24?auto=format&fit=crop&w=480&q=70',
-      rating: '5.0',
-      distance: '8.0 km',
-      pickupTime: 'Today',
-      address: '20A St 337, Toul Kork',
-      price: '$4.00',
-      originalPrice: '$10.00',
-      remaining: 0,
-      bagsAvailable: 0,
-      isAvailable: false,
-      status: 'SOLD_OUT',
-      category: 'Food',
-      description: 'Daily fresh unsold quiches, pastries and premium roast cold brew coffee.',
-    },
-  ];
-
-  // 1. Fetch live listings from backend DB
+  // 1. Fetch live listings from backend DB (strictly real merchant listings)
   const loadListings = async () => {
     setIsLoading(true);
     try {
       const data = await getActiveListings(activeCategory === 'All' ? 'all' : activeCategory.toLowerCase(), searchQuery);
-      if (Array.isArray(data) && data.length > 0) {
+      if (Array.isArray(data)) {
         const normalized = data.map(normalizeListing).filter(Boolean);
-        // Combine with fallback to ensure full rich visual layout
-        const combined = [...normalized];
-        fallbackListings.forEach((fb) => {
-          if (!combined.some((c) => c.title === fb.title || c.id === fb.id)) {
-            combined.push(normalizeListing(fb));
-          }
-        });
-        setListings(combined);
+        setListings(normalized);
       } else {
-        setListings(fallbackListings.map(normalizeListing));
+        setListings([]);
       }
     } catch (err) {
       console.error('Failed to load listings:', err);
-      setListings(fallbackListings.map(normalizeListing));
+      setListings([]);
     } finally {
       setIsLoading(false);
     }
@@ -360,35 +163,45 @@ export default function CustomerExploreFeed({
   };
 
   // Comprehensive, instant filtering based on active category & search query
-  const filteredListings = listings.filter((item) => {
-    // 1. Category filter
-    const itemCat = (item.category || '').toLowerCase();
-    const itemTitle = (item.title || '').toLowerCase();
-    const activeCatLower = activeCategory.toLowerCase();
+  const filteredListings = listings
+    .filter((item) => {
+      // 1. Category filter
+      const itemCat = (item.category || '').toLowerCase();
+      const itemTitle = (item.title || '').toLowerCase();
+      const activeCatLower = activeCategory.toLowerCase();
 
-    let matchesCategory = true;
-    if (activeCategory !== 'All') {
-      matchesCategory =
-        itemCat === activeCatLower ||
-        itemCat.includes(activeCatLower) ||
-        (activeCatLower === 'pastry' && (itemCat.includes('bak') || itemTitle.includes('pastry') || itemTitle.includes('bread') || itemTitle.includes('croissant'))) ||
-        (activeCatLower === 'food' && (itemCat.includes('meal') || itemCat.includes('food') || itemCat.includes('bento'))) ||
-        (activeCatLower === 'asian' && (itemTitle.includes('donburi') || itemTitle.includes('bento') || itemCat.includes('asian') || itemCat.includes('japanese')));
-    }
+      let matchesCategory = true;
+      if (activeCategory !== 'All') {
+        matchesCategory =
+          itemCat === activeCatLower ||
+          itemCat.includes(activeCatLower) ||
+          (activeCatLower === 'pastry' && (itemCat.includes('bak') || itemTitle.includes('pastry') || itemTitle.includes('bread') || itemTitle.includes('croissant'))) ||
+          (activeCatLower === 'food' && (itemCat.includes('meal') || itemCat.includes('food') || itemCat.includes('bento'))) ||
+          (activeCatLower === 'asian' && (itemTitle.includes('donburi') || itemTitle.includes('bento') || itemCat.includes('asian') || itemCat.includes('japanese')));
+      }
 
-    if (!matchesCategory) return false;
+      if (!matchesCategory) return false;
 
-    // 2. Search query filter
-    if (!searchQuery.trim()) return true;
-    const q = searchQuery.toLowerCase().trim();
-    return (
-      (item.store || '').toLowerCase().includes(q) ||
-      (item.title || '').toLowerCase().includes(q) ||
-      (item.address || '').toLowerCase().includes(q) ||
-      (item.category || '').toLowerCase().includes(q) ||
-      (item.description || '').toLowerCase().includes(q)
-    );
-  });
+      // 2. Search query filter
+      if (!searchQuery.trim()) return true;
+      const q = searchQuery.toLowerCase().trim();
+      return (
+        (item.store || '').toLowerCase().includes(q) ||
+        (item.title || '').toLowerCase().includes(q) ||
+        (item.address || '').toLowerCase().includes(q) ||
+        (item.category || '').toLowerCase().includes(q) ||
+        (item.description || '').toLowerCase().includes(q)
+      );
+    })
+    .sort((a, b) => {
+      // Render food base on quantity: show the most quantity first
+      const qtyA = Number(a.remaining ?? a.bagsAvailable ?? a.remainingCount ?? 0);
+      const qtyB = Number(b.remaining ?? b.bagsAvailable ?? b.remainingCount ?? 0);
+      if (qtyB !== qtyA) {
+        return qtyB - qtyA; // Highest quantity first
+      }
+      return (b.status === 'ACTIVE' ? 1 : 0) - (a.status === 'ACTIVE' ? 1 : 0);
+    });
 
   const cartCount = cart.reduce((sum, it) => sum + (it.quantity || 1), 0);
   const cartTotal = cart.reduce((sum, it) => {
@@ -437,12 +250,8 @@ export default function CustomerExploreFeed({
           title="Open Notifications"
         >
           <Bell className="w-5 h-5" />
-          {unreadCount > 0 ? (
-            <span className="absolute -top-1 -right-1 min-w-[20px] h-5 px-1.5 rounded-full bg-[#2E7D32] text-white text-[10px] font-black flex items-center justify-center ring-2 ring-white shadow-sm animate-bounce">
-              {unreadCount}
-            </span>
-          ) : (
-            <span className="absolute top-2.5 right-2.5 w-2 h-2 rounded-full bg-[#2E7D32] ring-2 ring-white" />
+          {unreadCount > 0 && (
+            <span className="absolute -top-0.5 -right-0.5 w-3 h-3 rounded-full bg-red-500 ring-2 ring-white shadow-sm animate-pulse" />
           )}
         </button>
       </div>
@@ -526,8 +335,9 @@ export default function CustomerExploreFeed({
         ))}
       </div>
 
-      {/* 4. SECTION: "New on FoodLink" (Horizontal Carousel) */}
-      <div className="space-y-3 pt-2">
+      {/* 4. SECTION: "New on FoodLink" (Horizontal Carousel - shown only when listings exist) */}
+      {filteredListings.length > 0 && (
+        <div className="space-y-3 pt-2">
         <div className="flex items-center justify-between px-1">
           <h2 className="text-lg sm:text-xl font-black text-[#1C1C1E] tracking-tight">
             New on FoodLink
@@ -673,6 +483,7 @@ export default function CustomerExploreFeed({
           })}
         </div>
       </div>
+      )}
 
       {/* 5. SECTION: "All bags near you" */}
       <div className="space-y-3 pt-4">

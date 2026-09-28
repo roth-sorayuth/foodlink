@@ -1,8 +1,8 @@
 // Customer Portal Mock Data with Cambodian & Phnom Penh food surplus items (Pastries, Healthy, Salads, Cakes & Drinks)
 
 export const CUSTOMER_USER = {
-  name: 'Sreypov',
-  avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=70',
+  name: 'Dara Sok',
+  avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=120&auto=format&fit=crop&q=70',
   savedKg: '14.2 kg',
   currentLocation: {
     district: 'Toul Kork',

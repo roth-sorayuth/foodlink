@@ -10,9 +10,7 @@ import {
   Check,
   Award,
   CheckCheck,
-  History,
   ShoppingBag,
-  Search,
   ChevronRight,
   RotateCcw,
   AlertCircle,
@@ -30,11 +28,7 @@ export default function CustomerActivePickup({
   onNavigateToProfile,
   onSelectListing
 }) {
-  // Tab state: 'now' (Active Pickup Pass) | 'before' (Past Reservation History)
-  const [activeSubTab, setActiveSubTab] = useState('now');
-  const [historySearch, setHistorySearch] = useState('');
   const [historyOrders, setHistoryOrders] = useState(() => getCustomerOrderHistory(currentUser?.id));
-  const [selectedActiveIdx, setSelectedActiveIdx] = useState(0);
 
   // Normalize current active order
   const currentActiveOrder = order;
@@ -99,10 +93,7 @@ export default function CustomerActivePickup({
     }
   });
 
-  const displayOrder = activeOrders[selectedActiveIdx] || currentActiveOrder;
-
-  // Past (Before) Orders
-  const pastOrders = historyOrders.filter((h) => h.status === 'COMPLETED' || (h.id !== displayOrder?.id && h.pickupCode !== displayOrder?.pickupCode && !activeOrders.some(a => a.id === h.id)));
+  const displayOrder = currentActiveOrder || activeOrders[0];
 
   // Parse items from active order
   const items = Array.isArray(displayOrder?.items) && displayOrder.items.length > 0
@@ -160,16 +151,6 @@ export default function CustomerActivePickup({
 
   const customerAvatar = currentUser?.avatar || displayOrder?.avatarUrl || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=80&q=70';
 
-  // Filtered past history
-  const filteredPastOrders = pastOrders.filter((o) => {
-    if (!historySearch.trim()) return true;
-    const q = historySearch.toLowerCase();
-    const titleMatch = (o.items || []).some((it) => it.title?.toLowerCase().includes(q));
-    const storeMatch = o.storeName?.toLowerCase().includes(q);
-    const codeMatch = o.pickupCode?.toLowerCase().includes(q);
-    return titleMatch || storeMatch || codeMatch;
-  });
-
   return (
     <div className="space-y-4 pb-24 max-w-xl mx-auto">
       
@@ -210,77 +191,11 @@ export default function CustomerActivePickup({
         </button>
       </div>
 
-      {/* Segmented Switcher: Now (Active) vs Before (History) */}
-      <div className="bg-stone-200/80 p-1 rounded-2xl flex items-center gap-1 shadow-inner">
-        <button
-          type="button"
-          onClick={() => setActiveSubTab('now')}
-          className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-            activeSubTab === 'now'
-              ? 'bg-white text-[#1C1C1E] shadow-xs'
-              : 'text-stone-600 hover:text-stone-900'
-          }`}
-        >
-          <span className={`w-2 h-2 rounded-full ${displayOrder && !isVerified ? 'bg-emerald-500 animate-pulse' : 'bg-stone-400'}`} />
-          <span>Now (Active Pass)</span>
-          {activeOrders.length > 0 && !isVerified && (
-            <span className="px-1.5 py-0.2 rounded-full bg-emerald-100 text-[#1b5e20] text-[10px] font-black">
-              {activeOrders.length}
-            </span>
-          )}
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveSubTab('before')}
-          className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-            activeSubTab === 'before'
-              ? 'bg-white text-[#1C1C1E] shadow-xs'
-              : 'text-stone-600 hover:text-stone-900'
-          }`}
-        >
-          <History className="w-3.5 h-3.5 text-stone-500" />
-          <span>Before (History)</span>
-          {pastOrders.length > 0 && (
-            <span className="px-1.5 py-0.2 rounded-full bg-stone-100 text-stone-600 text-[10px] font-bold">
-              {pastOrders.length}
-            </span>
-          )}
-        </button>
-      </div>
-
-      {/* ======================================================== */}
-      {/* TAB 1: NOW (ACTIVE RESERVATIONS)                          */}
-      {/* ======================================================== */}
-      {activeSubTab === 'now' && (
-        <div className="space-y-4 animate-in fade-in">
-          
-          {/* Multiple active order switcher (if more than 1 active) */}
-          {activeOrders.length > 1 && (
-            <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
-              {activeOrders.map((ord, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => {
-                    setSelectedActiveIdx(idx);
-                    setIsVerified(ord.status === 'COMPLETED');
-                  }}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold shrink-0 transition-all cursor-pointer flex items-center gap-1.5 border ${
-                    selectedActiveIdx === idx
-                      ? 'bg-[#1b5e20] text-white border-[#1b5e20] shadow-xs'
-                      : 'bg-white text-stone-700 border-stone-200/80 hover:bg-stone-50'
-                  }`}
-                >
-                  <span>Pass #{ord.pickupCode || ord.orderNumber}</span>
-                  <span className="opacity-75">· {ord.storeName || 'CAD Bakery'}</span>
-                </button>
-              ))}
-            </div>
-          )}
-
-          {displayOrder ? (
-            <>
-              {/* Hero Status Banner */}
+      {/* Active Digital Pickup Pass Container */}
+      <div className="space-y-4 animate-in fade-in">
+        {displayOrder ? (
+          <>
+            {/* Hero Status Banner */}
               <div className="text-center space-y-2 py-1">
                 <div className="relative inline-block">
                   <div className={`w-14 h-14 rounded-full flex items-center justify-center mx-auto shadow-md transition-all ${
@@ -482,164 +397,10 @@ export default function CustomerActivePickup({
                 >
                   Explore Today's Surplus
                 </button>
-                <button
-                  onClick={() => setActiveSubTab('before')}
-                  className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 font-bold text-xs transition-colors cursor-pointer"
-                >
-                  View Past History
-                </button>
               </div>
             </div>
           )}
-        </div>
-      )}
-
-      {/* ======================================================== */}
-      {/* TAB 2: BEFORE (RESERVATION HISTORY)                       */}
-      {/* ======================================================== */}
-      {activeSubTab === 'before' && (
-        <div className="space-y-4 animate-in fade-in">
-          
-          {/* History Impact Statistics Pill */}
-          <div className="grid grid-cols-3 gap-2 p-3 rounded-2xl bg-white border border-stone-200/80 shadow-2xs text-center">
-            <div className="space-y-0.5">
-              <span className="text-[10px] text-stone-400 uppercase font-bold block">Rescued</span>
-              <span className="text-sm sm:text-base font-black text-[#1C1C1E]">
-                {pastOrders.reduce((sum, o) => sum + (o.items?.length || 1), 0)} bags
-              </span>
-            </div>
-            <div className="space-y-0.5 border-x border-stone-100">
-              <span className="text-[10px] text-stone-400 uppercase font-bold block">Total Saved</span>
-              <span className="text-sm sm:text-base font-black text-[#2E7D32]">
-                ${pastOrders.reduce((sum, o) => sum + (parseFloat(o.totalSaved) || 10.5), 0).toFixed(2)}
-              </span>
-            </div>
-            <div className="space-y-0.5">
-              <span className="text-[10px] text-stone-400 uppercase font-bold block">CO₂ Diverted</span>
-              <span className="text-sm sm:text-base font-black text-[#1b5e20]">
-                {pastOrders.reduce((sum, o) => sum + (parseFloat(o.co2SavedKg) || 1.8), 0).toFixed(1)} kg
-              </span>
-            </div>
-          </div>
-
-          {/* Search in History */}
-          <div className="relative">
-            <Search className="w-4 h-4 text-stone-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              value={historySearch}
-              onChange={(e) => setHistorySearch(e.target.value)}
-              placeholder="Search past reserves by item, bakery, or code..."
-              className="w-full pl-9 pr-3 py-2.5 bg-white border border-stone-200/80 rounded-2xl text-xs font-semibold placeholder:text-stone-400 shadow-2xs outline-none focus:border-[#2E7D32]"
-            />
-          </div>
-
-          {/* Past Orders List */}
-          {filteredPastOrders.length > 0 ? (
-            <div className="space-y-3">
-              {filteredPastOrders.map((past, idx) => {
-                const pItems = Array.isArray(past.items) && past.items.length > 0 ? past.items : [{
-                  title: 'Artisan Pastry & Sourdough Surprise Bag',
-                  quantity: 1,
-                  price: past.totalPrice || 4.99,
-                  originalPrice: 16.00,
-                  photoUrl: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=400&q=70',
-                }];
-                const mainItem = pItems[0];
-                const saved = past.totalSaved || (16.00 - (past.totalPrice || 4.99)).toFixed(2);
-
-                return (
-                  <div
-                    key={idx}
-                    className="bg-white rounded-3xl border border-stone-200/80 p-4 sm:p-5 shadow-2xs space-y-3 transition-all hover:border-emerald-300"
-                  >
-                    {/* Top Row: Store, Date, and Collected Status */}
-                    <div className="flex items-center justify-between pb-2 border-b border-stone-100 text-xs">
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-stone-900">{past.storeName || 'CAD Bakery'}</span>
-                        <span className="text-stone-300">·</span>
-                        <span className="text-stone-500">{past.completedAt || past.pickupDate || 'Completed'}</span>
-                      </div>
-
-                      <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 text-[#1b5e20] text-[10px] font-black flex items-center gap-1">
-                        <Check className="w-3 h-3 stroke-[3]" />
-                        Collected
-                      </span>
-                    </div>
-
-                    {/* Middle: Item Details */}
-                    <div className="flex items-center gap-3">
-                      <div className="w-14 h-14 rounded-2xl overflow-hidden shrink-0 border border-stone-200 shadow-2xs">
-                        <OptimizedImage
-                          src={mainItem.photoUrl || 'https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=400&q=70'}
-                          alt={mainItem.title}
-                          width={100}
-                          height={100}
-                          quality={70}
-                          className="w-full h-full object-cover"
-                          containerClassName="w-full h-full"
-                        />
-                      </div>
-
-                      <div className="min-w-0 flex-1">
-                        <h4 className="font-bold text-xs sm:text-sm text-[#1C1C1E] truncate">
-                          {mainItem.quantity || 1}× {mainItem.title}
-                        </h4>
-                        <div className="flex items-center gap-2 mt-0.5 text-xs">
-                          <span className="font-extrabold text-[#1b5e20]">${(past.totalPrice || 4.99).toFixed(2)}</span>
-                          <span className="text-[10px] text-stone-400 font-semibold">Saved ${saved}</span>
-                        </div>
-                        <div className="flex items-center gap-2 mt-1">
-                          <span className="px-2 py-0.5 rounded-md bg-stone-100 text-stone-600 text-[10px] font-mono font-bold">
-                            Pass #{past.pickupCode}
-                          </span>
-                          <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-[#1b5e20] text-[10px] font-bold flex items-center gap-1">
-                            <Leaf className="w-2.5 h-2.5" />
-                            {past.co2SavedKg || 1.8} kg CO₂
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Bottom Action: Reserve Again */}
-                    <div className="pt-2 border-t border-stone-100 flex items-center justify-between">
-                      <span className="text-[11px] text-stone-400 font-medium">Verified FoodLink Rescue</span>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (onSelectListing) {
-                            onSelectListing({
-                              id: past.listingId || 'cad-surprise-sourdough',
-                              title: mainItem.title,
-                              price: mainItem.price,
-                              image: mainItem.photoUrl,
-                              store: past.storeName,
-                            });
-                          } else {
-                            onBackToHome();
-                          }
-                        }}
-                        className="px-3.5 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-[#1b5e20] text-xs font-extrabold flex items-center gap-1 transition-colors cursor-pointer"
-                      >
-                        <RotateCcw className="w-3 h-3" />
-                        <span>Reserve Again</span>
-                      </button>
-                    </div>
-
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="bg-white rounded-3xl border border-stone-200/80 p-8 text-center space-y-2 shadow-2xs">
-              <span className="text-2xl">📜</span>
-              <p className="font-bold text-xs text-stone-700">No past reserves found</p>
-              <p className="text-[11px] text-stone-400">All your collected and completed food rescues will appear here.</p>
-            </div>
-          )}
-
-        </div>
-      )}
+      </div>
 
       {/* Bottom Back Button */}
       <div className="pt-2 text-center">

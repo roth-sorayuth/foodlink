@@ -39,13 +39,28 @@ export const CLOUD_DROPS_TOPIC = 'foodlink_cad_live_drops';
 export function onNewListingDrop(callback) {
   if (typeof callback !== 'function') return () => {};
 
-  // Track seen IDs to prevent duplicate trigger if received via multiple channels
-  const seenDropIds = new Set();
+  // Track seen event keys to prevent duplicate trigger if received via multiple channels simultaneously
+  const seenEvents = new Map();
   const safeCallback = (data) => {
+    const notifId = data?.notification?.id;
     const listingId = data?.listing?.id || data?.id;
-    if (listingId) {
-      if (seenDropIds.has(listingId)) return;
-      seenDropIds.add(listingId);
+    const qty = data?.listing?.remaining ?? data?.listing?.bagsAvailable ?? '';
+    const isRestock = data?.isRestocked ? 'restock' : 'new';
+    const eventKey = notifId || (listingId ? `${listingId}-${qty}-${isRestock}` : null);
+    
+    const now = Date.now();
+    if (eventKey) {
+      const lastSeen = seenEvents.get(eventKey);
+      if (lastSeen && now - lastSeen < 3000) {
+        return; // Deduplicate echoes from multiple channels within 3 seconds
+      }
+      seenEvents.set(eventKey, now);
+      // Clean up old entries
+      if (seenEvents.size > 100) {
+        for (const [k, ts] of seenEvents.entries()) {
+          if (now - ts > 10000) seenEvents.delete(k);
+        }
+      }
     }
     callback(data);
   };
@@ -125,11 +140,11 @@ export function onNewListingDrop(callback) {
 export async function getActiveListings(category = 'all', search = '') {
   let backendListings = [];
 
-  // 1. Fetch from backend if URL is configured (with 1.5s timeout so hosted site never hangs)
+  // Fetch real listings from backend database
   if (API_BASE_URL) {
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 1500);
+      const timeoutId = setTimeout(() => controller.abort(), 3000);
       const params = new URLSearchParams();
       if (category && category !== 'all') params.append('category', category);
       if (search) params.append('search', search);
@@ -140,37 +155,17 @@ export async function getActiveListings(category = 'all', search = '') {
         backendListings = await res.json();
       }
     } catch (error) {
-      console.warn('API listings fetch skipped or timed out, using cloud sync and fallback');
+      console.warn('API listings fetch skipped or timed out:', error);
     }
   }
 
-  // 2. Poll cloud topic for any items published across devices on Vercel
-  try {
-    const cloudRes = await fetch(`https://ntfy.sh/${CLOUD_DROPS_TOPIC}/json?poll=1`);
-    if (cloudRes.ok) {
-      const text = await cloudRes.text();
-      const lines = text.trim().split('\n');
-      const cloudItems = [];
-      for (const line of lines) {
-        try {
-          const parsed = JSON.parse(line);
-          const rawMsg = typeof parsed.message === 'string' ? JSON.parse(parsed.message) : (parsed.message || parsed);
-          const item = rawMsg?.listing || rawMsg;
-          if (item && item.id && !cloudItems.some((c) => c.id === item.id)) {
-            cloudItems.push(item);
-          }
-        } catch {}
-      }
-      if (cloudItems.length > 0) {
-        // Prepend cloud drops to backend listings
-        return [...cloudItems.reverse(), ...backendListings.filter((b) => !cloudItems.some((c) => c.id === b.id))];
-      }
-    }
-  } catch (cloudErr) {
-    // Ignore network error
-  }
-
-  return backendListings;
+  return Array.isArray(backendListings)
+    ? [...backendListings].sort((a, b) => {
+        const qtyA = Number(a.bagsAvailable ?? a.remaining ?? 0);
+        const qtyB = Number(b.bagsAvailable ?? b.remaining ?? 0);
+        return qtyB - qtyA;
+      })
+    : [];
 }
 
 /**
@@ -281,9 +276,21 @@ export async function getCustomerOrders(userId) {
  */
 export async function getNotifications() {
   try {
-    const res = await fetch(`${API_BASE_URL}/notifications`);
+    const res = await fetch(`${API_BASE_URL}/notifications?type=NEW_LISTING&role=customer`);
     if (!res.ok) throw new Error('Failed to fetch notifications');
-    return await res.json();
+    const data = await res.json();
+    return Array.isArray(data)
+      ? data.filter(
+          (n) =>
+            n &&
+            n.type === 'NEW_LISTING' &&
+            !n.title?.toLowerCase().includes('order') &&
+            !n.title?.toLowerCase().includes('pickup') &&
+            !n.title?.toLowerCase().includes('claim') &&
+            !n.message?.toLowerCase().includes('claimed') &&
+            !n.message?.toLowerCase().includes('verified')
+        )
+      : [];
   } catch (error) {
     console.error('Error fetching notifications:', error);
     return [];

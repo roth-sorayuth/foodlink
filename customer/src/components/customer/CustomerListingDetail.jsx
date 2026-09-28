@@ -26,27 +26,29 @@ export default function CustomerListingDetail({
   const [quantity, setQuantity] = useState(initialQuantity);
   const [justAdded, setJustAdded] = useState(false);
 
-  // Dynamic listing properties with clean defaults
-  const title = listing?.title || 'Artisan Sourdough & Croissant Surprise Box';
+  // Dynamic listing properties with clean real values
+  const title = listing?.title || 'Surplus Item';
   const storeName = (typeof listing?.store === 'string' ? listing.store : listing?.store?.name) || listing?.storeName || 'CAD Bakery';
-  const category = listing?.category || 'Pastry';
-  const image = listing?.image || listing?.photoUrl || 'https://images.unsplash.com/photo-1555507036-ab1f4038808a?auto=format&fit=crop&w=640&q=75';
+  const category = listing?.category || 'Surplus';
+  const image = listing?.image || listing?.photoUrl || '';
   const address = (typeof listing?.address === 'string' ? listing.address : listing?.store?.address) || '422 St 178, Daun Penh';
   const rating = (typeof listing?.rating === 'string' || typeof listing?.rating === 'number' ? listing.rating : listing?.store?.rating) || '4.9';
-  const bags = listing?.remaining !== undefined ? listing.remaining : (listing?.bagsAvailable || 3);
-  const pickupWindow = listing?.pickupTime || `${listing?.pickupStart || '6:30 PM'} – ${listing?.pickupEnd || '7:30 PM'}`;
-  const description = listing?.description || "Assortment of fresh surplus bakery items prepared today. Contents vary based on daily unsold surplus.";
+  const bags = listing?.remaining !== undefined
+    ? Number(listing.remaining)
+    : (listing?.bagsAvailable !== undefined ? Number(listing.bagsAvailable) : 0);
+  const pickupWindow = listing?.pickupTime || (listing?.pickupStart ? `${listing.pickupStart} – ${listing?.pickupEnd || '7:30 PM'}` : '6:30 PM – 7:30 PM');
+  const description = listing?.description || "Fresh surplus items prepared today.";
 
   const priceNum = typeof listing?.price === 'number'
     ? listing.price
-    : parseFloat(String(listing?.price || '4.99').replace(/[^0-9.]/g, '')) || 4.99;
+    : parseFloat(String(listing?.price || '0').replace(/[^0-9.]/g, '')) || 0;
   const origPriceNum = typeof listing?.originalPrice === 'number'
     ? listing.originalPrice
-    : parseFloat(String(listing?.originalPrice || '16.00').replace(/[^0-9.]/g, '')) || 16.00;
+    : parseFloat(String(listing?.originalPrice || '0').replace(/[^0-9.]/g, '')) || 0;
   
-  const discount = listing?.discount || 'Save 69%';
-  const isSoldOut = bags <= 0 || listing?.status === 'PAUSED' || listing?.isAvailable === false;
-  const maxAvailable = Math.min(Math.max(bags, 1), 10);
+  const discount = listing?.discount || (origPriceNum > priceNum && origPriceNum > 0 ? `${Math.round(((origPriceNum - priceNum) / origPriceNum) * 100)}% OFF` : null);
+  const isSoldOut = bags <= 0 || listing?.status === 'PAUSED' || listing?.status === 'SOLD_OUT' || listing?.isAvailable === false;
+  const maxAvailable = Math.min(Math.max(bags, 0), 10);
 
   return (
     <div className="max-w-xl mx-auto space-y-4 pb-28">
@@ -69,7 +71,7 @@ export default function CustomerListingDetail({
           className="w-8 h-8 rounded-full overflow-hidden ring-2 ring-[#2E7D32]/30 shadow-xs cursor-pointer"
         >
           <OptimizedImage
-            src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=80&q=70"
+            src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=80&q=70"
             alt="Profile"
             width={80}
             height={80}

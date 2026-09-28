@@ -87,23 +87,9 @@ export default function MerchantOrders({ onOpenVerify, onNavigateToProfile, onCo
         setCompletedOrders(completed);
         if (onPendingOrdersChange) onPendingOrdersChange(pending.length);
       } else {
-        // Fallback demo order
-        const fallbackPending = [
-          normalizeOrder({
-            id: 'ord-demo',
-            user: { name: 'Dara Sok' },
-            orderNumber: '#FS-84920',
-            pickupCode: 'SAVER-789',
-            listing: { title: 'Artisan Pastry & Sourdough Surprise Bag' },
-            quantity: 1,
-            totalPrice: 4.99,
-            co2SavedKg: 1.2,
-            status: 'PENDING',
-            createdAt: new Date().toISOString(),
-          }),
-        ];
-        setPendingOrders(fallbackPending);
-        if (onPendingOrdersChange) onPendingOrdersChange(fallbackPending.length);
+        setPendingOrders([]);
+        setCompletedOrders([]);
+        if (onPendingOrdersChange) onPendingOrdersChange(0);
       }
     } catch (err) {
       console.error('Failed to load orders:', err);
@@ -116,7 +102,7 @@ export default function MerchantOrders({ onOpenVerify, onNavigateToProfile, onCo
     loadOrders();
   }, []);
 
-  // Listen for real-time incoming orders via Socket.io
+  // Listen for real-time incoming orders & pickup verifications via Socket.io
   useEffect(() => {
     const handleOrderCreated = (data) => {
       const order = data?.order || data;
@@ -129,10 +115,37 @@ export default function MerchantOrders({ onOpenVerify, onNavigateToProfile, onCo
       showToast(`🔔 New Order! ${normalized.customer} reserved ${normalized.qty} bag(s) (Code: ${normalized.code})`);
     };
 
+    const handlePickupVerified = (data) => {
+      const { orderId, orderNumber, pickupCode } = data || {};
+      setPendingOrders((prev) => {
+        const target = prev.find(
+          (o) => o.id === orderId || o.orderNumber === orderNumber || o.code === pickupCode
+        );
+        if (!target) return prev;
+        const remaining = prev.filter((o) => o.id !== target.id);
+        if (onPendingOrdersChange) onPendingOrdersChange(remaining.length);
+
+        setCompletedOrders((compPrev) => [
+          {
+            id: target.id,
+            customer: target.customer,
+            orderNumber: target.orderNumber,
+            staff: 'Staff (You)',
+            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          },
+          ...compPrev,
+        ]);
+
+        return remaining;
+      });
+    };
+
     socket.on('ORDER_CREATED', handleOrderCreated);
+    socket.on('PICKUP_VERIFIED', handlePickupVerified);
 
     return () => {
       socket.off('ORDER_CREATED', handleOrderCreated);
+      socket.off('PICKUP_VERIFIED', handlePickupVerified);
     };
   }, [onPendingOrdersChange]);
 
@@ -236,26 +249,7 @@ export default function MerchantOrders({ onOpenVerify, onNavigateToProfile, onCo
         </button>
       </div>
 
-      {/* Notice Banner: Pickups Arriving + Verify Button */}
-      <div className="bg-[#FFEFE7] border border-orange-200/80 rounded-3xl p-4 flex items-center justify-between shadow-2xs">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-2xl bg-[#8C3A00] text-white flex items-center justify-center shrink-0">
-            <Clock className="w-5 h-5" />
-          </div>
-          <div>
-            <h3 className="font-extrabold text-sm text-[#8C3A00]">{pendingOrders.length} {pendingOrders.length === 1 ? 'pickup' : 'pickups'} arriving</h3>
-            <p className="text-xs text-[#8C3A00]/80">Between 6:30 PM – 7:30 PM (Current Rush)</p>
-          </div>
-        </div>
 
-        <button
-          onClick={onOpenVerify}
-          className="px-3.5 py-2 rounded-xl bg-white hover:bg-stone-50 border border-orange-300 text-stone-900 font-bold text-xs flex items-center gap-1.5 shadow-2xs cursor-pointer transition-transform active:scale-95"
-        >
-          <QrCode className="w-4 h-4 text-stone-700" />
-          <span>Verify</span>
-        </button>
-      </div>
 
       {/* Group Section: Pickup Window Current */}
       {activeFilter !== 'completed' && (

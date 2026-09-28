@@ -39,7 +39,7 @@ export default function CustomerProfile({ onBackToHome, currentUser }) {
   const [toastMessage, setToastMessage] = useState(null);
 
   const userName = currentUser?.name || 'Sarah Jenkins';
-  const userAvatar = currentUser?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=160&q=70';
+  const userAvatar = currentUser?.avatar || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=160&q=70';
   const userEmail = currentUser?.email || 'demo.customer@foodlink.org';
 
   const showToast = (msg) => {
@@ -261,65 +261,29 @@ export default function CustomerProfile({ onBackToHome, currentUser }) {
         </div>
       </section>
 
-      {/* Milestone Card */}
-      <section className="bg-white rounded-2xl border border-stone-200/80 p-5 shadow-xs space-y-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-[#2E7D32] flex items-center justify-center text-white shrink-0">
-              <Sprout className="w-5 h-5" />
-            </div>
-            <div>
-              <h3 className="font-bold text-sm text-[#1C1C1E]">Tree Planter Milestone</h3>
-              <p className="text-xs text-stone-500">Just 2 meals away from unlocking your Golden Sprout Badge!</p>
-            </div>
-          </div>
-          <span className="font-bold text-sm text-[#1C1C1E]">28 / 30 Meals <span className="text-[#2E7D32]">(93%)</span></span>
-        </div>
-
-        <div className="w-full h-2.5 bg-stone-100 rounded-full overflow-hidden">
-          <div className="h-full bg-[#2E7D32] rounded-full w-[93%]" />
-        </div>
-      </section>
-
-      {/* Orders List & Sidebar Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 space-y-3">
-          <h2 className="text-base font-bold text-[#1C1C1E]">Order History & Rescues</h2>
-          <div className="space-y-3">
-            {initialOrders.map((ord) => (
-              <div key={ord.id} className="p-4 bg-white rounded-2xl border border-stone-200/80 flex items-center justify-between shadow-2xs">
-                <div className="flex items-center gap-3">
-                  <div className={`w-11 h-11 rounded-2xl ${ord.iconBg} flex items-center justify-center text-xl shrink-0`}>
-                    {ord.iconText}
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-sm text-[#1C1C1E]">{ord.store}</h3>
-                    <p className="text-xs text-stone-600">{ord.itemTitle}</p>
-                    <span className="text-[11px] text-stone-400">{ord.co2} • {ord.time}</span>
-                  </div>
+      {/* Orders List */}
+      <div className="space-y-3">
+        <h2 className="text-base font-bold text-[#1C1C1E]">Order History & Rescues</h2>
+        <div className="space-y-3">
+          {initialOrders.map((ord) => (
+            <div key={ord.id} className="p-4 bg-white rounded-2xl border border-stone-200/80 flex items-center justify-between shadow-2xs">
+              <div className="flex items-center gap-3">
+                <div className={`w-11 h-11 rounded-2xl ${ord.iconBg} flex items-center justify-center text-xl shrink-0`}>
+                  {ord.iconText}
                 </div>
-
-                <div className="text-right">
-                  <span className="font-extrabold text-sm text-[#2E7D32] block">{ord.price}</span>
-                  <span className="text-[10px] text-[#FF8A3D] font-bold">{ord.savedText}</span>
+                <div>
+                  <h3 className="font-bold text-sm text-[#1C1C1E]">{ord.store}</h3>
+                  <p className="text-xs text-stone-600">{ord.itemTitle}</p>
+                  <span className="text-[11px] text-stone-400">{ord.co2} • {ord.time}</span>
                 </div>
               </div>
-            ))}
-          </div>
-        </div>
 
-        <div className="space-y-4">
-          <div className="bg-white rounded-2xl border border-stone-200/80 p-5 shadow-xs space-y-3">
-            <h3 className="font-bold text-sm text-[#1C1C1E]">Rescue Certificate</h3>
-            <div className="p-3 bg-[#FFF8F0] border border-amber-200/70 rounded-xl space-y-1">
-              <span className="text-[10px] text-[#2E7D32] font-bold block">FOODSAVER OFFICIAL REGISTRY</span>
-              <p className="font-bold text-sm text-stone-900">Sarah Jenkins</p>
-              <p className="text-xs font-extrabold text-[#2E7D32]">70.0 kg CO₂e Diverted</p>
+              <div className="text-right">
+                <span className="font-extrabold text-sm text-[#2E7D32] block">{ord.price}</span>
+                <span className="text-[10px] text-[#FF8A3D] font-bold">{ord.savedText}</span>
+              </div>
             </div>
-            <button onClick={() => showToast('Certificate downloaded')} className="w-full py-2.5 rounded-xl bg-[#2E7D32] text-white text-xs font-bold">
-              Download Certificate PDF
-            </button>
-          </div>
+          ))}
         </div>
       </div>
 

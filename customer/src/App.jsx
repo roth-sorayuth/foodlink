@@ -83,8 +83,16 @@ export default function App() {
       try {
         const notifs = await getNotifications();
         if (Array.isArray(notifs)) {
-          setNotifications(notifs);
-          const unread = notifs.filter((n) => !n.isRead).length;
+          const valid = notifs.filter(
+            (n) =>
+              n.type === 'NEW_LISTING' &&
+              !n.title?.includes('Order Received') &&
+              !n.title?.includes('Pickup Confirmed') &&
+              !n.message?.includes('just claimed') &&
+              !n.message?.includes('successfully verified')
+          );
+          setNotifications(valid);
+          const unread = valid.filter((n) => !n.isRead).length;
           setUnreadCount(unread);
         }
       } catch (err) {
@@ -94,6 +102,27 @@ export default function App() {
     loadInitialNotifications();
   }, []);
 
+  // Re-fetch notifications whenever user opens the notifications modal
+  useEffect(() => {
+    if (isNotificationsOpen) {
+      getNotifications().then((notifs) => {
+        if (Array.isArray(notifs)) {
+          const valid = notifs.filter(
+            (n) =>
+              n.type === 'NEW_LISTING' &&
+              !n.title?.includes('Order Received') &&
+              !n.title?.includes('Pickup Confirmed') &&
+              !n.message?.includes('just claimed') &&
+              !n.message?.includes('successfully verified')
+          );
+          setNotifications(valid);
+          const unread = valid.filter((n) => !n.isRead).length;
+          setUnreadCount(unread);
+        }
+      }).catch((err) => console.warn('Could not re-fetch notifications:', err));
+    }
+  }, [isNotificationsOpen]);
+
   // 2. Real-Time Listener at App Root (WebSockets + BroadcastChannel + LocalStorage)
   useEffect(() => {
     const handleNewListing = (data) => {
@@ -101,33 +130,162 @@ export default function App() {
       setActiveAlert(data);
       playNotificationSound();
 
-      const newNotif = data?.notification || {
-        id: `notif-${Date.now()}`,
+      const isRestock = Boolean(
+        data?.isRestocked ||
+        data?.notification?.title?.includes('Restock') ||
+        data?.notification?.message?.includes('restocked')
+      );
+      const notifTitle = data?.notification?.title || (isRestock ? 'Surplus Food Restocked! 🔥' : 'New Surplus Food Available!');
+      const bags = data?.listing?.remaining ?? data?.listing?.bagsAvailable ?? 1;
+      const store = data?.listing?.storeName || 'CAD Bakery';
+      const notifMsg = data?.notification?.message || (isRestock
+        ? `${store} just restocked "${data?.listing?.title || 'Surplus Item'}"! (${bags} available)`
+        : `${store} just listed "${data?.listing?.title || 'Surplus Item'}"`);
+
+      const listingId = data?.listing?.id || data?.listingId || data?.notification?.listingId;
+      const notifId = data?.notification?.id || `notif-${listingId || Date.now()}`;
+
+      const newNotif = {
+        ...(data?.notification || {}),
+        id: notifId,
         type: 'NEW_LISTING',
-        title: 'New Surplus Food Available!',
-        message: `${data?.listing?.storeName || 'CAD Bakery'} just listed "${data?.listing?.title}"`,
-        listing: data?.listing,
+        title: notifTitle,
+        message: notifMsg,
+        listingId,
+        listing: {
+          ...(data?.listing || {}),
+          bagsAvailable: bags,
+          remaining: bags,
+        },
         isRead: false,
         createdAt: new Date().toISOString(),
       };
 
-      setNotifications((prev) => [newNotif, ...prev.filter((n) => n.id !== newNotif.id)]);
+      setNotifications((prev) => {
+        const existingIdx = prev.findIndex(
+          (n) => (listingId && (n.listingId === listingId || n.listing?.id === listingId)) || n.id === notifId
+        );
+
+        if (existingIdx !== -1) {
+          const existing = prev[existingIdx];
+          const updated = {
+            ...existing,
+            ...newNotif,
+            id: existing.id,
+            listing: {
+              ...(existing.listing || {}),
+              ...(newNotif.listing || {}),
+              bagsAvailable: bags,
+              remaining: bags,
+            },
+            isRead: false,
+            createdAt: new Date().toISOString(),
+          };
+          const rest = prev.filter((_, idx) => idx !== existingIdx);
+          return [updated, ...rest];
+        }
+
+        return [newNotif, ...prev];
+      });
+
       setUnreadCount((prev) => prev + 1);
     };
 
     const handleNotificationReceived = (notif) => {
-      console.log('⚡ [Customer App] Received live notification:', notif);
-      setNotifications((prev) => [notif, ...prev.filter((n) => n.id !== notif.id)]);
+      if (!notif || notif.type !== 'NEW_LISTING') return;
+      const title = (notif.title || '').toLowerCase();
+      const msg = (notif.message || '').toLowerCase();
+      if (title.includes('order') || title.includes('pickup') || title.includes('claim')) return;
+      if (msg.includes('claimed') || msg.includes('verified') || msg.includes('code:')) return;
+
+      console.log('⚡ [Customer App] Received live surplus notification:', notif);
+      setNotifications((prev) => {
+        const listingId = notif.listingId || notif.listing?.id;
+        const existingIdx = prev.findIndex(
+          (n) => (listingId && (n.listingId === listingId || n.listing?.id === listingId)) || n.id === notif.id
+        );
+
+        if (existingIdx !== -1) {
+          const existing = prev[existingIdx];
+          const updated = {
+            ...existing,
+            ...notif,
+            id: existing.id,
+            listing: {
+              ...(existing.listing || {}),
+              ...(notif.listing || {}),
+            },
+            isRead: false,
+            createdAt: new Date().toISOString(),
+          };
+          const rest = prev.filter((_, idx) => idx !== existingIdx);
+          return [updated, ...rest];
+        }
+
+        return [notif, ...prev];
+      });
       setUnreadCount((prev) => prev + 1);
+    };
+
+    const handleListingUpdated = (updatedListing) => {
+      if (!updatedListing || !updatedListing.id) return;
+      console.log('⚡ [Customer App] Received LISTING_UPDATED:', updatedListing.id, 'bags:', updatedListing.bagsAvailable);
+
+      // 1. Update selectedListing if currently open
+      setSelectedListing((prev) => {
+        if (prev && prev.id === updatedListing.id) {
+          return {
+            ...prev,
+            ...updatedListing,
+            remaining: updatedListing.bagsAvailable,
+            bagsAvailable: updatedListing.bagsAvailable,
+          };
+        }
+        return prev;
+      });
+
+      // 2. Update notification card for this listing so amount decreases immediately
+      setNotifications((prev) =>
+        prev.map((n) => {
+          const match = n.listingId === updatedListing.id || n.listing?.id === updatedListing.id;
+          if (match) {
+            const store = updatedListing.storeName || n.listing?.storeName || 'CAD Bakery';
+            const priceNum = typeof updatedListing.price === 'number' ? updatedListing.price : 4.99;
+            const remaining = updatedListing.bagsAvailable;
+            const isSoldOut = remaining <= 0;
+            const updatedMsg = isSoldOut
+              ? `${store}'s "${updatedListing.title}" is now Sold Out!`
+              : `${store} has "${updatedListing.title}" (${remaining} available for $${priceNum.toFixed(2)})`;
+
+            return {
+              ...n,
+              message: updatedMsg,
+              listing: {
+                ...(n.listing || {}),
+                ...updatedListing,
+                remaining,
+                bagsAvailable: remaining,
+              },
+            };
+          }
+          return n;
+        })
+      );
     };
 
     // Subscribes across Socket.io, BroadcastChannel, and storage events
     const unsubscribeNewDrops = onNewListingDrop(handleNewListing);
     socket.on('NOTIFICATION_RECEIVED', handleNotificationReceived);
+    socket.on('NEW_NOTIFICATION', handleNotificationReceived);
+    socket.on('NEW_LISTING_DROPPED', handleNewListing);
+    socket.on('LISTING_UPDATED', handleListingUpdated);
 
     return () => {
       unsubscribeNewDrops();
       socket.off('NOTIFICATION_RECEIVED', handleNotificationReceived);
+      socket.off('NEW_NOTIFICATION', handleNotificationReceived);
+      socket.off('NEW_LISTING_DROPPED', handleNewListing);
+      socket.off('LISTING_UPDATED', handleListingUpdated);
     };
   }, []);
 
@@ -236,6 +394,9 @@ export default function App() {
       if (response && response.order) {
         setActiveOrder(response.order);
         saveCustomerActiveOrder(currentUser?.id, response.order);
+        if (Array.isArray(response.listings)) {
+          response.listings.forEach(handleListingUpdated);
+        }
       } else {
         const fallbackCode = String(Math.floor(100000 + Math.random() * 900000));
         const fallbackOrder = {

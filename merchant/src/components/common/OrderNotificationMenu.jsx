@@ -12,15 +12,22 @@ import {
   CheckCheck,
   PlusCircle
 } from 'lucide-react';
-import { getNotifications, getMerchantOrders, markAllNotificationsAsRead, markNotificationAsRead } from '../../services/api';
+import {
+  getNotifications,
+  getMerchantOrders,
+  markAllNotificationsAsRead,
+  markNotificationAsRead,
+  createRealOrder
+} from '../../services/api';
 import { socket } from '../../services/socket';
 
-export default function OrderNotificationMenu({ onNavigateToOrders, onOpenVerify, showToast, hasPendingPickups = true, onNewOrder }) {
+export default function OrderNotificationMenu({ onNavigateToOrders, onOpenVerify, showToast, hasPendingPickups = true, onNewOrder, refreshTrigger }) {
   const [isOpen, setIsOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [hasNewAlert, setHasNewAlert] = useState(false);
+  const [activeFilter, setActiveFilter] = useState('all'); // 'all' | 'pending' | 'completed'
   const menuRef = useRef(null);
 
   // Close dropdown when clicking outside
@@ -96,31 +103,17 @@ export default function OrderNotificationMenu({ onNavigateToOrders, onOpenVerify
         });
       }
 
-      // Fallback demo order if none exist in empty database
-      if (formatted.length === 0) {
-        formatted.push({
-          id: 'demo-order-1',
-          orderId: 'demo-1',
-          type: 'ORDER_CONFIRMED',
-          customerName: 'Dara Sok',
-          customerAvatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=120&q=80',
-          itemTitle: 'Assorted Pastry Surprise',
-          orderNumber: '#FS-84920',
-          pickupCode: 'SAVER-705',
-          price: '$5.99',
-          quantity: 1,
-          status: 'PENDING',
-          time: '10:45 AM',
-          timestamp: Date.now() - 1000 * 60 * 15,
-          isRead: false,
-        });
-      }
-
-      // Sort by newest first
-      formatted.sort((a, b) => b.timestamp - a.timestamp);
+      // Sort: Pending orders first, then newest first
+      formatted.sort((a, b) => {
+        const aPending = a.status !== 'COMPLETED';
+        const bPending = b.status !== 'COMPLETED';
+        if (aPending && !bPending) return -1;
+        if (!aPending && bPending) return 1;
+        return b.timestamp - a.timestamp;
+      });
 
       setNotifications(formatted);
-      const unread = formatted.filter((item) => !item.isRead).length;
+      const unread = formatted.filter((item) => !item.isRead && item.status !== 'COMPLETED').length;
       setUnreadCount(unread);
     } catch (err) {
       console.error('Error loading order notifications:', err);
@@ -128,6 +121,13 @@ export default function OrderNotificationMenu({ onNavigateToOrders, onOpenVerify
       setIsLoading(false);
     }
   };
+
+  // Re-fetch whenever menu is opened or trigger updates
+  useEffect(() => {
+    if (isOpen) {
+      loadOrderNotifications();
+    }
+  }, [isOpen, refreshTrigger]);
 
   useEffect(() => {
     loadOrderNotifications();
@@ -168,10 +168,27 @@ export default function OrderNotificationMenu({ onNavigateToOrders, onOpenVerify
       }
     };
 
+    // Listen to real-time PICKUP_VERIFIED socket broadcast
+    const handlePickupVerified = (data) => {
+      console.log('⚡ [Merchant Notification] Pickup Verified:', data);
+      setNotifications((prev) =>
+        prev.map((item) => {
+          const isMatch =
+            (data.orderId && item.orderId === data.orderId) ||
+            (data.pickupCode && item.pickupCode === data.pickupCode) ||
+            (data.orderNumber && item.orderNumber === data.orderNumber);
+          return isMatch ? { ...item, status: 'COMPLETED', isRead: true } : item;
+        })
+      );
+      setUnreadCount((prev) => Math.max(0, prev - 1));
+    };
+
     socket.on('ORDER_CREATED', handleNewOrder);
+    socket.on('PICKUP_VERIFIED', handlePickupVerified);
 
     return () => {
       socket.off('ORDER_CREATED', handleNewOrder);
+      socket.off('PICKUP_VERIFIED', handlePickupVerified);
     };
   }, [onNewOrder]);
 
@@ -207,42 +224,44 @@ export default function OrderNotificationMenu({ onNavigateToOrders, onOpenVerify
     }
   };
 
-  // Demo order generator for presentation
-  const handleSimulateDemoOrder = () => {
+  // Create a real customer order in the backend database
+  const handleSimulateDemoOrder = async () => {
     const demoCustomers = [
-      { name: 'Alex Johnson', item: 'CAD Baguette & Bread Bundle', price: '$3.99', code: 'SAVER-442' },
-      { name: 'Emma Watson', item: 'Assorted Pastry Surprise', price: '$5.99', code: 'SAVER-918' },
-      { name: 'Michael Chen', item: 'Artisan Sourdough Loaf', price: '$4.50', code: 'SAVER-306' },
+      { name: 'Sophea Chan', email: 'sophea.chan@demo.foodlink', avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=120&q=80' },
+      { name: 'Kosal Meng', email: 'kosal.meng@demo.foodlink', avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=120&q=80' },
+      { name: 'Chanda Vicheka', email: 'chanda.vicheka@demo.foodlink', avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=120&q=80' },
     ];
     const picked = demoCustomers[Math.floor(Math.random() * demoCustomers.length)];
-    const mockOrder = {
-      id: `sim-${Date.now()}`,
-      orderId: `sim-ord-${Date.now()}`,
-      type: 'ORDER_CONFIRMED',
-      customerName: picked.name,
-      customerAvatar: null,
-      itemTitle: picked.item,
-      orderNumber: `#FS-${Math.floor(10000 + Math.random() * 90000)}`,
-      pickupCode: picked.code,
-      price: picked.price,
-      quantity: 1,
-      status: 'PENDING',
-      time: 'Just now',
-      timestamp: Date.now(),
-      isRead: false,
-      isNewLive: true,
-    };
+    try {
+      const res = await createRealOrder({
+        customerName: picked.name,
+        customerEmail: picked.email,
+        avatarUrl: picked.avatar,
+        storeId: 'st_cad',
+        listingId: 'list_01',
+        quantity: 1,
+      });
 
-    setNotifications((prev) => [mockOrder, ...prev]);
-    setUnreadCount((prev) => prev + 1);
-    setHasNewAlert(true);
-    if (onNewOrder) {
-      onNewOrder();
-    }
-    if (showToast) {
-      showToast(`🔔 Demo Order Created! ${picked.name} reserved ${picked.item}`);
+      if (res?.order) {
+        if (showToast) {
+          showToast(`🔔 Real Order Placed! ${picked.name} (Pickup Code: ${res.order.pickupCode})`);
+        }
+        await loadOrderNotifications();
+      }
+    } catch (err) {
+      console.warn('Real order creation error:', err.message);
     }
   };
+
+  const pendingOrders = notifications.filter((n) => n.status !== 'COMPLETED');
+  const completedOrders = notifications.filter((n) => n.status === 'COMPLETED');
+  const hasPending = pendingOrders.length > 0;
+
+  const filteredList = notifications.filter((n) => {
+    if (activeFilter === 'pending') return n.status !== 'COMPLETED';
+    if (activeFilter === 'completed') return n.status === 'COMPLETED';
+    return true;
+  });
 
   return (
     <div className="relative" ref={menuRef}>
@@ -256,7 +275,7 @@ export default function OrderNotificationMenu({ onNavigateToOrders, onOpenVerify
         className={`relative inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-bold transition-all shadow-2xs active:scale-95 cursor-pointer ${
           isOpen
             ? 'bg-[#2E7D32] text-white ring-2 ring-[#2E7D32]/30 shadow-sm'
-            : hasPendingPickups
+            : hasPending
             ? 'bg-emerald-50 text-[#2E7D32] border border-emerald-300 hover:bg-emerald-100/80'
             : 'bg-white text-stone-700 border border-stone-200/90 hover:bg-stone-50'
         }`}
@@ -264,7 +283,7 @@ export default function OrderNotificationMenu({ onNavigateToOrders, onOpenVerify
         {/* Bell Icon with Real-Time Ping */}
         <div className="relative">
           <Bell className={`w-4 h-4 ${isOpen ? 'text-white' : 'text-[#2E7D32]'}`} />
-          {hasPendingPickups && (
+          {hasPending && (
             <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#FF8A3D] opacity-75" />
               <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-[#FF8A3D] ring-2 ring-white shadow-xs" />
@@ -294,7 +313,9 @@ export default function OrderNotificationMenu({ onNavigateToOrders, onOpenVerify
                   </span>
                 </div>
                 <p className="text-[11px] text-stone-500">
-                  {unreadCount > 0 ? `${unreadCount} new order${unreadCount > 1 ? 's' : ''} waiting` : 'All orders up to date'}
+                  {pendingOrders.length > 0
+                    ? `${pendingOrders.length} order${pendingOrders.length > 1 ? 's' : ''} awaiting pickup`
+                    : 'All pickups completed'}
                 </p>
               </div>
             </div>
@@ -318,83 +339,140 @@ export default function OrderNotificationMenu({ onNavigateToOrders, onOpenVerify
             </div>
           </div>
 
+          {/* Quick Filter Tabs */}
+          <div className="flex items-center gap-1.5 px-4 py-2 border-b border-stone-100 bg-stone-50/60">
+            <button
+              onClick={() => setActiveFilter('all')}
+              className={`px-2.5 py-1 rounded-full text-[11px] font-bold transition-all cursor-pointer ${
+                activeFilter === 'all'
+                  ? 'bg-[#2E7D32] text-white shadow-2xs'
+                  : 'bg-white text-stone-600 hover:bg-stone-100 border border-stone-200/80'
+              }`}
+            >
+              All ({notifications.length})
+            </button>
+            <button
+              onClick={() => setActiveFilter('pending')}
+              className={`px-2.5 py-1 rounded-full text-[11px] font-bold transition-all cursor-pointer ${
+                activeFilter === 'pending'
+                  ? 'bg-[#2E7D32] text-white shadow-2xs'
+                  : 'bg-white text-stone-600 hover:bg-stone-100 border border-stone-200/80'
+              }`}
+            >
+              Awaiting ({pendingOrders.length})
+            </button>
+            <button
+              onClick={() => setActiveFilter('completed')}
+              className={`px-2.5 py-1 rounded-full text-[11px] font-bold transition-all cursor-pointer ${
+                activeFilter === 'completed'
+                  ? 'bg-[#2E7D32] text-white shadow-2xs'
+                  : 'bg-white text-stone-600 hover:bg-stone-100 border border-stone-200/80'
+              }`}
+            >
+              Picked Up ({completedOrders.length})
+            </button>
+          </div>
+
           {/* Orders Feed */}
           <div className="max-h-[380px] overflow-y-auto divide-y divide-stone-100 scrollbar-thin">
             {isLoading ? (
               <div className="py-8 text-center text-xs text-stone-400 font-medium">
                 Loading live customer orders...
               </div>
-            ) : notifications.length === 0 ? (
+            ) : filteredList.length === 0 ? (
               <div className="py-10 px-4 text-center space-y-2">
                 <div className="w-10 h-10 rounded-full bg-stone-100 flex items-center justify-center mx-auto text-stone-400">
                   <ShoppingBag className="w-5 h-5" />
                 </div>
-                <p className="font-bold text-xs text-stone-700">No Orders Yet</p>
+                <p className="font-bold text-xs text-stone-700">
+                  {activeFilter === 'pending' ? 'No Pending Pickups' : 'No Orders Found'}
+                </p>
                 <p className="text-[11px] text-stone-400 max-w-xs mx-auto">
-                  When a customer reserves surplus food from CAD Bakery, their order and pickup code appear here instantly.
+                  {activeFilter === 'pending'
+                    ? 'All customer orders have been verified and picked up!'
+                    : 'When a customer reserves surplus food from CAD Bakery, their order and pickup code appear here instantly.'}
                 </p>
               </div>
             ) : (
-              notifications.map((item) => (
-                <div
-                  key={item.id}
-                  onClick={() => handleSelectOrder(item)}
-                  className={`p-3.5 hover:bg-stone-50 transition-colors cursor-pointer flex items-start gap-3 relative ${
-                    !item.isRead ? 'bg-emerald-50/30' : ''
-                  }`}
-                >
-                  {/* Unread indicator bar */}
-                  {!item.isRead && (
-                    <span className="absolute left-1 top-4 bottom-4 w-1 bg-[#2E7D32] rounded-full" />
-                  )}
-
-                  {/* Customer Avatar */}
-                  <div className="w-9 h-9 rounded-full bg-emerald-100 border border-emerald-200/80 overflow-hidden flex items-center justify-center text-xs font-bold text-[#2E7D32] shrink-0 mt-0.5">
-                    {item.customerAvatar ? (
-                      <img src={item.customerAvatar} alt={item.customerName} className="w-full h-full object-cover" />
-                    ) : (
-                      <span>{item.customerName.slice(0, 2).toUpperCase()}</span>
+              filteredList.map((item) => {
+                const isCompleted = item.status === 'COMPLETED';
+                return (
+                  <div
+                    key={item.id}
+                    onClick={() => handleSelectOrder(item)}
+                    className={`p-3.5 hover:bg-stone-50 transition-colors cursor-pointer flex items-start gap-3 relative ${
+                      !item.isRead && !isCompleted ? 'bg-emerald-50/30' : isCompleted ? 'opacity-85' : ''
+                    }`}
+                  >
+                    {/* Unread indicator bar */}
+                    {!item.isRead && !isCompleted && (
+                      <span className="absolute left-1 top-4 bottom-4 w-1 bg-[#2E7D32] rounded-full" />
                     )}
-                  </div>
 
-                  {/* Order Details */}
-                  <div className="flex-1 min-w-0 space-y-1">
-                    <div className="flex items-center justify-between gap-1">
-                      <h4 className="font-bold text-xs text-stone-900 truncate">
-                        {item.customerName}
-                      </h4>
-                      <span className="text-[10px] text-stone-400 whitespace-nowrap">
-                        {item.time}
-                      </span>
+                    {/* Customer Avatar */}
+                    <div className={`w-9 h-9 rounded-full border overflow-hidden flex items-center justify-center text-xs font-bold shrink-0 mt-0.5 ${
+                      isCompleted ? 'bg-stone-100 border-stone-200 text-stone-600' : 'bg-emerald-100 border-emerald-200/80 text-[#2E7D32]'
+                    }`}>
+                      {item.customerAvatar ? (
+                        <img src={item.customerAvatar} alt={item.customerName} className="w-full h-full object-cover" />
+                      ) : (
+                        <span>{item.customerName.slice(0, 2).toUpperCase()}</span>
+                      )}
                     </div>
 
-                    <p className="text-[11px] text-stone-600 font-medium truncate">
-                      {item.quantity}x {item.itemTitle}
-                    </p>
-
-                    {/* Order Code & Price Pill */}
-                    <div className="flex items-center justify-between pt-1">
-                      <div className="flex items-center gap-1.5">
-                        <span className="px-2 py-0.5 rounded-md bg-stone-100 border border-stone-200 text-stone-700 text-[10px] font-mono font-bold">
-                          {item.pickupCode}
-                        </span>
-                        <span className="text-[11px] font-bold text-[#2E7D32]">
-                          {item.price}
+                    {/* Order Details */}
+                    <div className="flex-1 min-w-0 space-y-1">
+                      <div className="flex items-center justify-between gap-1">
+                        <div className="flex items-center gap-1.5 truncate">
+                          <h4 className="font-bold text-xs text-stone-900 truncate">
+                            {item.customerName}
+                          </h4>
+                          {isCompleted && (
+                            <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200/60">
+                              Picked Up
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-[10px] text-stone-400 whitespace-nowrap">
+                          {item.time}
                         </span>
                       </div>
 
-                      {/* Quick Verify button */}
-                      <button
-                        onClick={(e) => handleVerifyCode(item.pickupCode, e)}
-                        className="px-2.5 py-1 rounded-full bg-[#2E7D32] hover:bg-[#256629] text-white text-[10px] font-bold shadow-2xs flex items-center gap-1 transition-all cursor-pointer"
-                      >
-                        <QrCode className="w-3 h-3" />
-                        <span>Verify</span>
-                      </button>
+                      <p className="text-[11px] text-stone-600 font-medium truncate">
+                        {item.quantity}x {item.itemTitle}
+                      </p>
+
+                      {/* Order Code & Price Pill */}
+                      <div className="flex items-center justify-between pt-1">
+                        <div className="flex items-center gap-1.5">
+                          <span className="px-2 py-0.5 rounded-md bg-stone-100 border border-stone-200 text-stone-700 text-[10px] font-mono font-bold">
+                            {item.pickupCode}
+                          </span>
+                          <span className="text-[11px] font-bold text-[#2E7D32]">
+                            {item.price}
+                          </span>
+                        </div>
+
+                        {/* Quick Verify button or Completed badge */}
+                        {isCompleted ? (
+                          <span className="px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-[#2E7D32] text-[10px] font-bold shadow-2xs flex items-center gap-1">
+                            <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                            <span>Picked Up</span>
+                          </span>
+                        ) : (
+                          <button
+                            onClick={(e) => handleVerifyCode(item.pickupCode, e)}
+                            className="px-2.5 py-1 rounded-full bg-[#2E7D32] hover:bg-[#256629] text-white text-[10px] font-bold shadow-2xs flex items-center gap-1 transition-all cursor-pointer active:scale-95"
+                          >
+                            <QrCode className="w-3 h-3" />
+                            <span>Verify</span>
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))
+                );
+              })
             )}
           </div>
 
