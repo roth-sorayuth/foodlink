@@ -18,7 +18,7 @@ import {
   X
 } from 'lucide-react';
 
-import { publishListing, updateMerchantListing, getMerchantListings, DEFAULT_MERCHANT_LISTINGS } from '../../services/api';
+import { publishListing, updateMerchantListing, getMerchantListings, notifyCustomerNewListing, DEFAULT_MERCHANT_LISTINGS } from '../../services/api';
 
 const CATEGORY_PRESETS = {
   bakery: [
@@ -284,6 +284,7 @@ export default function CreateListingPage({ onBack, onSave, onNavigateToProfile,
         } catch (apiErr) {
           console.warn('Backend API publish error, falling back locally:', apiErr.message);
         }
+        notifyCustomerNewListing(result?.listing || payload);
       }
 
       const prevSoldCount = editingItemId && result?.listing?.bagsSold !== undefined

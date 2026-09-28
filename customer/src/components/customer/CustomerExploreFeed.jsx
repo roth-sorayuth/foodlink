@@ -14,7 +14,7 @@ import {
   X,
   Plus,
 } from 'lucide-react';
-import { socket, getActiveListings, playNotificationSound } from '../../services/api';
+import { socket, getActiveListings, playNotificationSound, onNewListingDrop } from '../../services/api';
 import OptimizedImage from '../common/OptimizedImage';
 import { getOptimizedImageUrl } from '../../utils/imageOptimizer';
 
@@ -313,14 +313,11 @@ export default function CustomerExploreFeed({
     loadListings();
   }, [activeCategory]);
 
-  // 2. Real-Time Socket.io listener for new listings
+  // 2. Real-Time Multi-Channel listener for new listings
   useEffect(() => {
     const handleNewListing = (data) => {
       const item = data?.listing || data;
       const normalized = normalizeListing(item);
-
-      // Play chime sound
-      playNotificationSound();
 
       // Show live drop notification banner on dashboard
       setLiveBannerListing(normalized);
@@ -346,11 +343,11 @@ export default function CustomerExploreFeed({
       );
     };
 
-    socket.on('NEW_LISTING', handleNewListing);
+    const unsubscribeNewDrops = onNewListingDrop(handleNewListing);
     socket.on('LISTING_UPDATED', handleListingUpdated);
 
     return () => {
-      socket.off('NEW_LISTING', handleNewListing);
+      unsubscribeNewDrops();
       socket.off('LISTING_UPDATED', handleListingUpdated);
     };
   }, []);

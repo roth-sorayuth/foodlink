@@ -9,13 +9,61 @@ export const socket = io(SOCKET_URL, {
   transports: ['websocket', 'polling'],
 });
 
-socket.on('connect', () => {
-  console.log('[Customer Socket] Connected to FoodLink Backend Gateway:', socket.id);
-});
+// BroadcastChannel for instant cross-tab / cross-window sync
+export const liveDropChannel = typeof window !== 'undefined' && window.BroadcastChannel
+  ? new BroadcastChannel('foodlink_live_channel')
+  : null;
 
-socket.on('disconnect', () => {
-  console.log('[Customer Socket] Disconnected from Backend Gateway');
-});
+/**
+ * Unified listener that catches new listing drops from:
+ * 1. Live Socket.io websocket events
+ * 2. Cross-tab BroadcastChannel
+ * 3. Cross-tab LocalStorage storage events
+ */
+export function onNewListingDrop(callback) {
+  if (typeof callback !== 'function') return () => {};
+
+  // 1. Socket.io listener
+  const socketHandler = (data) => {
+    callback(data);
+  };
+  socket.on('NEW_LISTING', socketHandler);
+
+  // 2. BroadcastChannel listener (cross-tab same origin)
+  let channelHandler = null;
+  if (liveDropChannel) {
+    channelHandler = (event) => {
+      if (event.data?.type === 'NEW_LISTING' && event.data?.data) {
+        callback(event.data.data);
+      }
+    };
+    liveDropChannel.addEventListener('message', channelHandler);
+  }
+
+  // 3. LocalStorage storage event listener (cross-tab fallback)
+  const storageHandler = (e) => {
+    if (e.key === 'foodlink_last_new_listing' && e.newValue) {
+      try {
+        const parsed = JSON.parse(e.newValue);
+        if (parsed && parsed.listing) {
+          callback(parsed);
+        }
+      } catch (err) {
+        // Ignore parse errors
+      }
+    }
+  };
+  window.addEventListener('storage', storageHandler);
+
+  // Unsubscribe cleanup function
+  return () => {
+    socket.off('NEW_LISTING', socketHandler);
+    if (liveDropChannel && channelHandler) {
+      liveDropChannel.removeEventListener('message', channelHandler);
+    }
+    window.removeEventListener('storage', storageHandler);
+  };
+}
 
 /**
  * Fetch all active listings from the backend database

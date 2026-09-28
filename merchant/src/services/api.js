@@ -1,4 +1,74 @@
+import { io } from 'socket.io-client';
+
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:5000';
+
+// Global Socket.io instance for Merchant App
+export const socket = io(SOCKET_URL, {
+  autoConnect: true,
+  transports: ['websocket', 'polling'],
+});
+
+socket.on('connect', () => {
+  console.log('[Merchant Socket] Connected to FoodLink Gateway:', socket.id);
+});
+
+// BroadcastChannel for instant cross-tab / cross-window sync
+const liveDropChannel = typeof window !== 'undefined' && window.BroadcastChannel
+  ? new BroadcastChannel('foodlink_live_channel')
+  : null;
+
+/**
+ * Broadcast new listing to Customer app via Socket.io, BroadcastChannel, and localStorage
+ */
+export function notifyCustomerNewListing(listing) {
+  if (!listing) return;
+  const priceNum = typeof listing.price === 'number'
+    ? listing.price
+    : parseFloat(String(listing.price || '4.99').replace(/[^0-9.]/g, '')) || 4.99;
+  
+  const payload = {
+    listing: {
+      ...listing,
+      price: priceNum,
+      storeName: listing.storeName || 'CAD Bakery',
+    },
+    notification: {
+      id: `notif-${Date.now()}`,
+      type: 'NEW_LISTING',
+      title: 'New Surplus Food Available!',
+      message: `${listing.storeName || 'CAD Bakery'} just listed "${listing.title}" for $${priceNum.toFixed(2)}`,
+      listingId: listing.id,
+      listing,
+      createdAt: new Date().toISOString(),
+    },
+  };
+
+  // 1. Emit to WebSocket server so remote customer devices receive it
+  try {
+    if (socket && socket.connected) {
+      socket.emit('NEW_LISTING_DROPPED', payload);
+    }
+  } catch (err) {
+    console.warn('[Merchant Socket] emit failed:', err);
+  }
+
+  // 2. BroadcastChannel for instant same-origin tab sync
+  try {
+    if (liveDropChannel) {
+      liveDropChannel.postMessage({ type: 'NEW_LISTING', data: payload });
+    }
+  } catch (err) {
+    console.warn('[Merchant BroadcastChannel] postMessage failed:', err);
+  }
+
+  // 3. LocalStorage storage event fallback across tabs
+  try {
+    localStorage.setItem('foodlink_last_new_listing', JSON.stringify({ ...payload, _ts: Date.now() }));
+  } catch (err) {
+    // Ignore quota or cross-origin errors
+  }
+}
 
 export const DEFAULT_MERCHANT_LISTINGS = [
   {
@@ -201,6 +271,9 @@ export async function publishListing(listingData) {
       createdAt: new Date().toISOString(),
     };
   }
+
+  // Instantly notify Customer app
+  notifyCustomerNewListing(created);
 
   return { success: true, listing: created };
 }

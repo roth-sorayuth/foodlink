@@ -38,6 +38,7 @@ import {
   markNotificationAsRead,
   markAllNotificationsAsRead,
   playNotificationSound,
+  onNewListingDrop,
 } from './services/api';
 
 import {
@@ -93,7 +94,7 @@ export default function App() {
     loadInitialNotifications();
   }, []);
 
-  // 2. Socket.io Real-Time Listener at App Root
+  // 2. Real-Time Listener at App Root (WebSockets + BroadcastChannel + LocalStorage)
   useEffect(() => {
     const handleNewListing = (data) => {
       console.log('⚡ [Customer App] Received live NEW_LISTING event:', data);
@@ -104,7 +105,7 @@ export default function App() {
         id: `notif-${Date.now()}`,
         type: 'NEW_LISTING',
         title: 'New Surplus Food Available!',
-        message: `${data?.listing?.storeName || 'Merchant'} just listed "${data?.listing?.title}"`,
+        message: `${data?.listing?.storeName || 'CAD Bakery'} just listed "${data?.listing?.title}"`,
         listing: data?.listing,
         isRead: false,
         createdAt: new Date().toISOString(),
@@ -120,11 +121,12 @@ export default function App() {
       setUnreadCount((prev) => prev + 1);
     };
 
-    socket.on('NEW_LISTING', handleNewListing);
+    // Subscribes across Socket.io, BroadcastChannel, and storage events
+    const unsubscribeNewDrops = onNewListingDrop(handleNewListing);
     socket.on('NOTIFICATION_RECEIVED', handleNotificationReceived);
 
     return () => {
-      socket.off('NEW_LISTING', handleNewListing);
+      unsubscribeNewDrops();
       socket.off('NOTIFICATION_RECEIVED', handleNotificationReceived);
     };
   }, []);

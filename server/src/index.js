@@ -55,6 +55,15 @@ io.on('connection', (socket) => {
     socket.emit('pong', { timestamp: Date.now() });
   });
 
+  // Re-broadcast merchant live listing drops to all connected customer clients
+  socket.on('NEW_LISTING_DROPPED', (data) => {
+    console.log(`[Socket.io] Merchant broadcasted NEW_LISTING_DROPPED: "${data?.listing?.title || 'New Item'}"`);
+    io.emit('NEW_LISTING', data);
+    if (data?.notification) {
+      io.emit('NEW_NOTIFICATION', data.notification);
+    }
+  });
+
   socket.on('disconnect', () => {
     console.log(`[Socket.io] Client disconnected: ${socket.id}`);
   });
