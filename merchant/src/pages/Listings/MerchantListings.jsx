@@ -75,12 +75,8 @@ export default function MerchantListings({
     };
   };
 
-  // Listings State initialized with custom listings + defaults immediately
-  const [listings, setListings] = useState(() => {
-    const custom = getCustomMerchantListings();
-    const all = [...custom, ...DEFAULT_MERCHANT_LISTINGS.filter((d) => !custom.some((c) => c.id === d.id))];
-    return all.map(normalizeMerchantItem);
-  });
+  // Listings State - starts empty, filled by API fetch
+  const [listings, setListings] = useState([]);
 
   // Fetch updated listings from database or cloud topic
   const loadListings = async () => {

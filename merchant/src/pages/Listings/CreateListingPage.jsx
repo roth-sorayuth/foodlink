@@ -114,7 +114,7 @@ const CATEGORY_PRESETS = {
 export default function CreateListingPage({ onBack, onSave, onNavigateToProfile, initialListing = null }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [editingItemId, setEditingItemId] = useState(initialListing?.id || null);
-  const [previousListings, setPreviousListings] = useState(() => DEFAULT_MERCHANT_LISTINGS);
+  const [previousListings, setPreviousListings] = useState([]);
 
   const [photoUrl, setPhotoUrl] = useState(
     initialListing?.image || initialListing?.photoUrl || 'https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=800&q=80'

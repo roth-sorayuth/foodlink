@@ -231,36 +231,11 @@ export default function MerchantDashboard({ onNavigateToProfile, onOpenCreate, o
     };
   }, []);
 
-  // Listings State
-  const [listings, setListings] = useState(() =>
-    DEFAULT_MERCHANT_LISTINGS.map(normalizeDashboardItem)
-  );
+  // Listings State - starts empty, filled by API fetch
+  const [listings, setListings] = useState([]);
 
-  // Reservations State
-  const [reservations, setReservations] = useState([
-    {
-      id: 'res-1',
-      code: '#SAVER-789',
-      customerName: 'Marcus L.',
-      avatarColor: 'bg-emerald-200 text-emerald-900',
-      initials: 'ML',
-      items: '1x Artisan Pastry & Sourdough',
-      paidAmount: '$4.99',
-      status: 'Ready for Pickup',
-      eta: 'Arriving ~6:35 PM'
-    },
-    {
-      id: 'res-2',
-      code: '#SAVER-412',
-      customerName: 'Sarah T.',
-      avatarColor: 'bg-orange-200 text-orange-950',
-      initials: 'ST',
-      items: '1x Croissant & Brioche Bundle',
-      paidAmount: '$3.99',
-      status: 'Ready for Pickup',
-      eta: 'Arriving ~7:10 PM'
-    }
-  ]);
+  // Reservations State - starts empty, filled by real orders
+  const [reservations, setReservations] = useState([]);
 
   // Create Listing Form State
   const [newTitle, setNewTitle] = useState('');
