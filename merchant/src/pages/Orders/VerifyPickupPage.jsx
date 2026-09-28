@@ -38,7 +38,7 @@ export default function VerifyPickupPage({ onBack, onCompleteHandover, initialCo
     } catch (err) {
       console.warn('Backend pickup verification:', err.message);
       onCompleteHandover({
-        customerName: 'Sarah Jenkins',
+        customerName: 'Verified Customer',
         code: cleanCode,
         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       });
@@ -125,7 +125,7 @@ export default function VerifyPickupPage({ onBack, onCompleteHandover, initialCo
 
             <div className="space-y-0.5">
               <div className="flex items-center gap-2">
-                <h3 className="font-extrabold text-sm text-[#1C1C1E]">Sarah Jenkins</h3>
+                <h3 className="font-extrabold text-sm text-[#1C1C1E]">Dara Sok</h3>
                 <span className="text-[11px] font-bold text-[#2E7D32]">Verified Customer</span>
               </div>
               <p className="text-xs font-semibold text-stone-700">1x Artisan Pastry & Sourdough Surprise Bag</p>

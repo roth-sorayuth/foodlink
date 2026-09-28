@@ -52,8 +52,8 @@ export default function CustomerExploreFeed({
   const normalizeListing = (item) => {
     const origPriceNum = typeof item.originalPrice === 'number' ? item.originalPrice : parseFloat(item.originalPrice) || 3.60;
     const priceNum = typeof item.price === 'number' ? item.price : parseFloat(item.price) || 1.80;
-    const remaining = item.bagsAvailable !== undefined ? item.bagsAvailable : (item.remainingCount !== undefined ? item.remainingCount : 3);
-    const isAvailable = remaining > 0 && item.status !== 'SOLD_OUT' && item.status !== 'PAUSED';
+    const remaining = item.bagsAvailable !== undefined ? Number(item.bagsAvailable) : (item.remainingCount !== undefined ? Number(item.remainingCount) : 0);
+    const isAvailable = remaining > 0 && item.status !== 'PAUSED';
 
     const rawImage = item.photoUrl || item.image || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=480&q=70';
     const rawLogo = item.store?.logoUrl || (item.storeName?.includes('CAD') || item.title?.includes('CAD') ? '/cad-bakery-logo.png' : null) || item.photoUrl || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=96&q=70';
@@ -505,7 +505,7 @@ export default function CustomerExploreFeed({
         <div className="flex gap-4 overflow-x-auto pb-4 pt-1 scrollbar-none -mx-3.5 px-3.5 sm:mx-0 sm:px-0">
           {filteredListings.slice(0, 5).map((item, idx) => {
             const isJustAdded = justAddedIds.has(item.id);
-            const isUnavailable = !item.isAvailable || item.remaining <= 0 || item.status === 'SOLD_OUT';
+            const isUnavailable = !item.isAvailable || item.remaining <= 0 || item.status === 'PAUSED';
             return (
               <div
                 key={item.id}
@@ -670,7 +670,7 @@ export default function CustomerExploreFeed({
           <div className="space-y-4">
             {filteredListings.map((item, idx) => {
               const isJustAdded = justAddedIds.has(item.id);
-              const isUnavailable = !item.isAvailable || item.remaining <= 0 || item.status === 'SOLD_OUT';
+              const isUnavailable = !item.isAvailable || item.remaining <= 0 || item.status === 'PAUSED';
               return (
               <div
                 key={item.id}

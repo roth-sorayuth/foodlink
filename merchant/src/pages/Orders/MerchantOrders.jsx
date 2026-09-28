@@ -91,7 +91,7 @@ export default function MerchantOrders({ onOpenVerify, onNavigateToProfile, onCo
         const fallbackPending = [
           normalizeOrder({
             id: 'ord-demo',
-            user: { name: 'Sarah Jenkins' },
+            user: { name: 'Dara Sok' },
             orderNumber: '#FS-84920',
             pickupCode: 'SAVER-789',
             listing: { title: 'Artisan Pastry & Sourdough Surprise Bag' },

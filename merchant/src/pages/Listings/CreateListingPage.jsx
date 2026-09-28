@@ -257,6 +257,9 @@ export default function CreateListingPage({ onBack, onSave, onNavigateToProfile,
     setIsSubmitting(true);
 
     try {
+      const bagsNum = parseInt(bagsAvailable, 10) || 0;
+      const isSoldOut = bagsNum <= 0;
+
       const payload = {
         title: bagName,
         description,
@@ -265,7 +268,8 @@ export default function CreateListingPage({ onBack, onSave, onNavigateToProfile,
         originalPrice: retailNum,
         price: priceNum,
         discount: `${discountPercent}% OFF`,
-        bagsAvailable,
+        bagsAvailable: bagsNum,
+        status: isSoldOut ? 'SOLD_OUT' : 'ACTIVE',
         pickupDate: pickupDate === 'today' ? 'Today' : 'Tomorrow',
         pickupStart: startTime,
         pickupEnd: endTime,
@@ -291,22 +295,36 @@ export default function CreateListingPage({ onBack, onSave, onNavigateToProfile,
         }
       }
 
+      const prevSoldCount = editingItemId && result?.listing?.bagsSold !== undefined
+        ? Number(result.listing.bagsSold)
+        : (initialListing?.soldCount !== undefined ? Number(initialListing.soldCount) : (initialListing?.bagsSold !== undefined ? Number(initialListing.bagsSold) : 0));
+
+      const totalCount = bagsNum + prevSoldCount;
+      const claimedPercent = totalCount > 0 ? Math.round((prevSoldCount / totalCount) * 100) : 0;
+
       const listingForState = {
         id: editingItemId || result?.listing?.id || `lst-${Date.now()}`,
         title: bagName,
         description,
         image: photoUrl,
-        status: 'Active',
-        tagText: `${bagsAvailable} left!`,
-        tagColor: 'bg-amber-500 text-white',
+        status: isSoldOut ? 'Sold Out' : 'Active',
+        isSoldOut,
+        remainingCount: bagsNum,
+        tagText: isSoldOut ? 'Sold Out' : (bagsNum <= 2 ? `${bagsNum} left!` : `${bagsNum} left`),
+        tagColor: isSoldOut ? 'bg-stone-900 text-stone-300' : (bagsNum <= 2 ? 'bg-amber-500 text-white' : 'bg-stone-800 text-white'),
         pickupWindow: `Pickup ${startTime} - ${endTime}`,
         price: `$${priceNum.toFixed(2)}`,
         originalValue: `$${retailNum.toFixed(2)} value`,
-        soldCount: 0,
-        totalCount: bagsAvailable,
-        claimedPercent: 0,
-        progressColor: 'bg-[#2E7D32]',
-        raw: result?.listing || payload,
+        soldCount: prevSoldCount,
+        totalCount,
+        claimedPercent,
+        progressColor: isSoldOut ? 'bg-stone-300' : (claimedPercent >= 75 ? 'bg-amber-500' : 'bg-[#2E7D32]'),
+        raw: {
+          ...(result?.listing || payload),
+          status: isSoldOut ? 'SOLD_OUT' : 'ACTIVE',
+          bagsAvailable: bagsNum,
+          bagsSold: prevSoldCount,
+        },
       };
 
       onSave(listingForState, Boolean(editingItemId));

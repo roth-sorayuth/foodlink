@@ -8,7 +8,9 @@ import {
   Plus,
   Minus,
   Sparkles,
-  Leaf
+  Leaf,
+  History,
+  CheckCircle2
 } from 'lucide-react';
 import OptimizedImage from '../common/OptimizedImage';
 
@@ -43,7 +45,7 @@ export default function CustomerListingDetail({
     : parseFloat(String(listing?.originalPrice || '16.00').replace(/[^0-9.]/g, '')) || 16.00;
   
   const discount = listing?.discount || 'Save 69%';
-  const isSoldOut = bags <= 0 || listing?.status === 'SOLD_OUT' || listing?.isAvailable === false;
+  const isSoldOut = bags <= 0 || listing?.status === 'PAUSED' || listing?.isAvailable === false;
   const maxAvailable = Math.min(Math.max(bags, 1), 10);
 
   return (
@@ -174,6 +176,41 @@ export default function CustomerListingDetail({
             <div className="truncate">
               <span className="text-[10px] text-stone-400 uppercase font-bold block">Pickup Address</span>
               <span className="font-medium text-stone-800 truncate">{address}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Reservation History: Before & Now */}
+        <div className="p-3.5 sm:p-4 rounded-2xl bg-stone-50/80 border border-stone-200/80 space-y-2.5">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-1.5 font-bold text-xs text-[#1C1C1E]">
+              <History className="w-3.5 h-3.5 text-[#2E7D32]" />
+              <span>Reservation Activity</span>
+            </div>
+            <span className="text-[10px] font-bold text-[#2E7D32] bg-emerald-100 px-2 py-0.5 rounded-full">
+              Live Updates
+            </span>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2 text-xs">
+            {/* Now */}
+            <div className="p-3 rounded-xl bg-white border border-stone-200/90 shadow-2xs space-y-1">
+              <span className="text-[10px] uppercase font-extrabold text-emerald-700 flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                Now (Available)
+              </span>
+              <p className="font-black text-sm text-[#1C1C1E]">{bags} bag{bags !== 1 ? 's' : ''} left</p>
+              <p className="text-[10px] text-stone-500 font-medium">Ready for pickup today</p>
+            </div>
+
+            {/* Before */}
+            <div className="p-3 rounded-xl bg-white border border-stone-200/90 shadow-2xs space-y-1">
+              <span className="text-[10px] uppercase font-extrabold text-stone-600 flex items-center gap-1">
+                <CheckCircle2 className="w-3 h-3 text-[#2E7D32]" />
+                Before (Claimed)
+              </span>
+              <p className="font-black text-sm text-[#1C1C1E]">{listing?.soldCount || listing?.bagsSold || 2} claimed today</p>
+              <p className="text-[10px] text-stone-500 font-medium">Rescued by community</p>
             </div>
           </div>
         </div>

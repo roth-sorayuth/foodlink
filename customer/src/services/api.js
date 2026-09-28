@@ -92,6 +92,22 @@ export async function reserveListing(target, maybeQuantity = 1, maybeUser = {}) 
 }
 
 /**
+ * Fetch customer orders from server
+ */
+export async function getCustomerOrders(userId) {
+  try {
+    const params = new URLSearchParams();
+    if (userId) params.append('userId', userId);
+    const res = await fetch(`${API_BASE_URL}/orders?${params.toString()}`);
+    if (!res.ok) throw new Error('Failed to fetch customer orders');
+    return await res.json();
+  } catch (error) {
+    console.error('Error fetching customer orders:', error);
+    return [];
+  }
+}
+
+/**
  * Fetch customer notifications
  */
 export async function getNotifications() {

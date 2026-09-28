@@ -25,7 +25,7 @@ import {
   ShoppingBag,
   Bell
 } from 'lucide-react';
-import { getMerchantListings, verifyOrderPickup, DEFAULT_MERCHANT_LISTINGS } from '../../services/api';
+import { getMerchantListings, updateMerchantListing, verifyOrderPickup, DEFAULT_MERCHANT_LISTINGS } from '../../services/api';
 import { socket } from '../../services/socket';
 
 export default function MerchantDashboard({ onNavigateToProfile, onOpenCreate, onOpenVerify, onEditListing, newListing, onNavigateToListings }) {
@@ -43,6 +43,8 @@ export default function MerchantDashboard({ onNavigateToProfile, onOpenCreate, o
   const [scanModalOpen, setScanModalOpen] = useState(false);
   const [claimCodeInput, setClaimCodeInput] = useState('');
   const [editModalItem, setEditModalItem] = useState(null);
+  const [editRemainingCount, setEditRemainingCount] = useState(0);
+  const [editPrice, setEditPrice] = useState('4.99');
   const [isLoading, setIsLoading] = useState(true);
 
   const showToast = (msg) => {
@@ -56,18 +58,22 @@ export default function MerchantDashboard({ onNavigateToProfile, onOpenCreate, o
   const normalizeDashboardItem = (item) => {
     const origPriceNum = typeof item.originalPrice === 'number' ? item.originalPrice : parseFloat(item.originalPrice) || 16.0;
     const priceNum = typeof item.price === 'number' ? item.price : parseFloat(item.price) || 4.99;
-    const remaining = item.bagsAvailable !== undefined ? item.bagsAvailable : (item.remainingCount !== undefined ? item.remainingCount : 2);
-    const sold = item.bagsSold !== undefined ? item.bagsSold : (item.soldCount || 4);
+    const remaining = item.bagsAvailable !== undefined 
+      ? Number(item.bagsAvailable) 
+      : (item.remainingCount !== undefined ? Number(item.remainingCount) : 0);
+    const sold = item.bagsSold !== undefined 
+      ? Number(item.bagsSold) 
+      : (item.soldCount !== undefined ? Number(item.soldCount) : 0);
     const total = remaining + sold;
     const claimedPercent = total > 0 ? Math.round((sold / total) * 100) : 100;
-    const isSoldOut = remaining <= 0 || item.status === 'SOLD_OUT' || item.status === 'Sold Out';
+    const isSoldOut = remaining <= 0;
 
     return {
       id: item.id,
       title: item.title,
       description: item.description || "Assortment of today's fresh surplus food items.",
       image: item.photoUrl || item.image || 'https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=700&q=80',
-      status: isSoldOut ? 'Sold Out' : 'Active',
+      status: isSoldOut ? 'Sold Out' : (item.status === 'PAUSED' ? 'Paused' : 'Active'),
       isSoldOut,
       remainingCount: remaining,
       tagText: isSoldOut ? 'Sold Out' : (remaining <= 2 ? `${remaining} left!` : `${remaining} left`),
@@ -81,6 +87,61 @@ export default function MerchantDashboard({ onNavigateToProfile, onOpenCreate, o
       progressColor: isSoldOut ? 'bg-stone-300' : (claimedPercent >= 75 ? 'bg-amber-500' : 'bg-[#2E7D32]'),
       raw: item,
     };
+  };
+
+  const handleOpenEditModal = (item) => {
+    setEditModalItem(item);
+    setEditRemainingCount(item.remainingCount !== undefined ? item.remainingCount : (item.totalCount - item.soldCount));
+    setEditPrice(item.price ? String(item.price).replace(/[^0-9.]/g, '') : '4.99');
+  };
+
+  const handleSaveEditModal = async () => {
+    if (!editModalItem) return;
+    const count = Math.max(0, parseInt(editRemainingCount, 10) || 0);
+    const priceVal = parseFloat(String(editPrice).replace(/[^0-9.]/g, '')) || 4.99;
+    const isNowSoldOut = count <= 0;
+
+    setListings((prev) =>
+      prev.map((item) => {
+        if (item.id === editModalItem.id) {
+          const nextTotal = (item.soldCount || 0) + count;
+          const nextClaimed = nextTotal > 0 ? Math.round(((item.soldCount || 0) / nextTotal) * 100) : 100;
+          return {
+            ...item,
+            remainingCount: count,
+            totalCount: nextTotal,
+            claimedPercent: nextClaimed,
+            price: `$${priceVal.toFixed(2)}`,
+            status: isNowSoldOut ? 'Sold Out' : 'Active',
+            isSoldOut: isNowSoldOut,
+            tagText: isNowSoldOut ? 'Sold Out' : (count <= 2 ? `${count} left!` : `${count} left`),
+            tagColor: isNowSoldOut ? 'bg-stone-900 text-stone-300' : (count <= 2 ? 'bg-amber-500 text-white' : 'bg-stone-800 text-white'),
+            progressColor: isNowSoldOut ? 'bg-stone-300' : (nextClaimed >= 75 ? 'bg-amber-500' : 'bg-[#2E7D32]'),
+            raw: {
+              ...(item.raw || item),
+              bagsAvailable: count,
+              price: priceVal,
+              status: isNowSoldOut ? 'SOLD_OUT' : 'ACTIVE',
+            },
+          };
+        }
+        return item;
+      })
+    );
+
+    showToast(`Updated "${editModalItem.title}" stock to ${count}!`);
+    const idToUpdate = editModalItem.id;
+    setEditModalItem(null);
+
+    try {
+      await updateMerchantListing(idToUpdate, {
+        bagsAvailable: count,
+        price: priceVal,
+        status: count > 0 ? 'ACTIVE' : 'SOLD_OUT',
+      });
+    } catch (err) {
+      console.error('Failed to sync edit listing:', err);
+    }
   };
 
   // Fetch initial listings from database
@@ -128,12 +189,21 @@ export default function MerchantDashboard({ onNavigateToProfile, onOpenCreate, o
       setListings((prev) => [normalizeDashboardItem(item), ...prev.filter((l) => l.id !== item.id)]);
     };
 
+    const handleListingUpdated = (data) => {
+      const item = data?.listing || data;
+      if (item && item.id) {
+        setListings((prev) => prev.map((l) => (l.id === item.id ? normalizeDashboardItem(item) : l)));
+      }
+    };
+
     socket.on('ORDER_CREATED', handleOrderCreated);
     socket.on('NEW_LISTING', handleNewListing);
+    socket.on('LISTING_UPDATED', handleListingUpdated);
 
     return () => {
       socket.off('ORDER_CREATED', handleOrderCreated);
       socket.off('NEW_LISTING', handleNewListing);
+      socket.off('LISTING_UPDATED', handleListingUpdated);
     };
   }, []);
 
@@ -491,7 +561,7 @@ export default function MerchantDashboard({ onNavigateToProfile, onOpenCreate, o
                       if (onEditListing) {
                         onEditListing(item);
                       } else {
-                        setEditModalItem(item);
+                        handleOpenEditModal(item);
                       }
                     }}
                     className="absolute bottom-3 right-3 w-9 h-9 rounded-full bg-white text-stone-800 shadow-md flex items-center justify-center hover:bg-stone-50 hover:scale-110 active:scale-95 transition-all cursor-pointer"
@@ -763,26 +833,26 @@ export default function MerchantDashboard({ onNavigateToProfile, onOpenCreate, o
                 <label className="text-stone-600">Update Remaining Count</label>
                 <input 
                   type="number" 
-                  defaultValue={editModalItem.totalCount - editModalItem.soldCount} 
+                  min="0"
+                  value={editRemainingCount} 
+                  onChange={(e) => setEditRemainingCount(e.target.value)}
                   className="w-full p-2 bg-stone-100 border border-stone-200 rounded-lg text-xs"
                 />
               </div>
               <div className="space-y-1">
-                <label className="text-stone-600">Price</label>
+                <label className="text-stone-600">Price ($)</label>
                 <input 
                   type="text" 
-                  defaultValue={editModalItem.price} 
+                  value={editPrice} 
+                  onChange={(e) => setEditPrice(e.target.value)}
                   className="w-full p-2 bg-stone-100 border border-stone-200 rounded-lg text-xs"
                 />
               </div>
             </div>
 
             <button
-              onClick={() => {
-                showToast(`Updated "${editModalItem.title}"!`);
-                setEditModalItem(null);
-              }}
-              className="w-full py-2.5 rounded-xl bg-[#2E7D32] text-white font-bold text-xs"
+              onClick={handleSaveEditModal}
+              className="w-full py-2.5 rounded-xl bg-[#2E7D32] hover:bg-[#256629] text-white font-bold text-xs cursor-pointer transition-colors"
             >
               Save Changes
             </button>

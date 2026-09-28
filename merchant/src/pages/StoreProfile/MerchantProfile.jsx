@@ -270,18 +270,18 @@ export default function MerchantProfile({ onNavigateToDashboard }) {
             <div className="flex items-center gap-2 pl-2 sm:pl-3 border-l border-stone-200 cursor-pointer group">
               <div className="relative">
                 <img 
-                  src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=160&q=80" 
-                  alt="Sarah Jenkins"
-                  className="w-9 h-9 rounded-full object-cover ring-2 ring-[#2E7D32]/30"
+                  src="/cad-bakery-logo.png" 
+                  alt="CAD Bakery Partner"
+                  className="w-9 h-9 rounded-full object-contain p-0.5 bg-white ring-2 ring-[#2E7D32]/30"
                 />
                 <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 rounded-full ring-1.5 ring-white" />
               </div>
               <div className="hidden lg:block text-left">
                 <div className="flex items-center gap-1">
-                  <span className="text-xs font-semibold text-[#1C1C1E] group-hover:text-[#2E7D32] transition-colors leading-tight">Sarah Jenkins</span>
+                  <span className="text-xs font-semibold text-[#1C1C1E] group-hover:text-[#2E7D32] transition-colors leading-tight">CAD Bakery</span>
                   <ChevronDown className="w-3 h-3 text-stone-400" />
                 </div>
-                <span className="text-[10px] text-stone-500 font-medium">Level 3 Hero</span>
+                <span className="text-[10px] text-stone-500 font-medium">Merchant Partner</span>
               </div>
             </div>
 
@@ -701,7 +701,7 @@ export default function MerchantProfile({ onNavigateToDashboard }) {
                   </span>
                   <span className="text-stone-500 font-mono">ID: #FS-CA-2490</span>
                 </div>
-                <h4 className="font-bold text-sm text-[#1C1C1E]">Sarah Jenkins</h4>
+                <h4 className="font-bold text-sm text-[#1C1C1E]">CAD Bakery</h4>
                 <p className="text-[11px] text-stone-500">Validated Environmental Contribution:</p>
                 <div className="text-lg font-extrabold text-[#2E7D32] tracking-tight">
                   70.0 kg CO₂e Diverted
@@ -998,7 +998,7 @@ export default function MerchantProfile({ onNavigateToDashboard }) {
               </div>
               <h4 className="font-extrabold text-xl text-[#1C1C1E]">Certificate of Food Rescue Excellence</h4>
               <p className="text-xs text-stone-500">This certifies that</p>
-              <p className="text-lg font-bold text-[#2E7D32]">Sarah Jenkins</p>
+              <p className="text-lg font-bold text-[#2E7D32]">CAD Bakery</p>
               <p className="text-xs text-stone-600 max-w-xs mx-auto">
                 has successfully diverted <strong>70.0 kg of CO₂e</strong> and saved <strong>28 fresh surplus meal bags</strong> from urban waste streams.
               </p>

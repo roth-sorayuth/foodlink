@@ -456,7 +456,12 @@ export async function updateListing(req, res) {
 
     if (updateData.price) updateData.price = parseFloat(updateData.price);
     if (updateData.originalPrice) updateData.originalPrice = parseFloat(updateData.originalPrice);
-    if (updateData.bagsAvailable !== undefined) updateData.bagsAvailable = parseInt(updateData.bagsAvailable, 10);
+    if (updateData.bagsAvailable !== undefined) {
+      updateData.bagsAvailable = parseInt(updateData.bagsAvailable, 10);
+      if (!updateData.status || updateData.status === 'SOLD_OUT' || updateData.status === 'ACTIVE') {
+        updateData.status = updateData.bagsAvailable > 0 ? 'ACTIVE' : 'SOLD_OUT';
+      }
+    }
     if (updateData.bagsSold !== undefined) updateData.bagsSold = parseInt(updateData.bagsSold, 10);
 
     let updatedListing;

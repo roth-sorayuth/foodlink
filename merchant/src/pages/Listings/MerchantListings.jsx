@@ -43,10 +43,10 @@ export default function MerchantListings({
   const normalizeMerchantItem = (item) => {
     const origPriceNum = typeof item.originalPrice === 'number' ? item.originalPrice : parseFloat(item.originalPrice) || 15.0;
     const priceNum = typeof item.price === 'number' ? item.price : parseFloat(item.price) || 4.99;
-    const remaining = item.bagsAvailable !== undefined ? item.bagsAvailable : (item.remainingCount || 2);
-    const sold = item.bagsSold !== undefined ? item.bagsSold : (item.soldCount || 4);
+    const remaining = item.bagsAvailable !== undefined ? Number(item.bagsAvailable) : (item.remainingCount !== undefined ? Number(item.remainingCount) : 0);
+    const sold = item.bagsSold !== undefined ? Number(item.bagsSold) : (item.soldCount !== undefined ? Number(item.soldCount) : 0);
     const total = remaining + sold;
-    const isSoldOut = remaining <= 0 || item.status === 'SOLD_OUT';
+    const isSoldOut = remaining <= 0;
 
     return {
       id: item.id,
@@ -55,7 +55,7 @@ export default function MerchantListings({
       image: item.photoUrl || item.image || 'https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=700&q=80',
       price: `$${priceNum.toFixed(2)}`,
       originalPrice: `$${origPriceNum.toFixed(2)}`,
-      status: isSoldOut ? 'sold-out' : 'active',
+      status: isSoldOut ? 'sold-out' : (item.status === 'PAUSED' ? 'paused' : 'active'),
       liveTag: isSoldOut ? `Sold Out (${sold}/${total})` : (remaining <= 2 ? 'Live • Selling Fast' : 'Live'),
       stockTag: remaining <= 2 && !isSoldOut ? `Only ${remaining} left` : null,
       soldCount: sold,
@@ -124,11 +124,14 @@ export default function MerchantListings({
       prev.map((item) => {
         if (item.id === id) {
           const isSoldOut = nextRemaining === 0;
+          const nextTotal = item.soldCount + nextRemaining;
           return {
             ...item,
             remainingCount: nextRemaining,
-            totalCount: item.soldCount + nextRemaining,
-            status: isSoldOut ? 'sold-out' : 'active',
+            totalCount: nextTotal,
+            status: isSoldOut ? 'sold-out' : (item.isPaused ? 'paused' : 'active'),
+            liveTag: isSoldOut ? `Sold Out (${item.soldCount}/${nextTotal})` : (nextRemaining <= 2 ? 'Live • Selling Fast' : 'Live'),
+            stockTag: nextRemaining <= 2 && !isSoldOut ? `Only ${nextRemaining} left` : null,
           };
         }
         return item;
@@ -174,13 +177,13 @@ export default function MerchantListings({
 
   const filteredListings = listings.filter((item) => {
     if (activeFilter === 'active') return true; // Show all items in main management feed; sold out ones appear in black & white
-    if (activeFilter === 'sold-out') return item.remainingCount <= 0 || item.status === 'sold-out';
+    if (activeFilter === 'sold-out') return item.remainingCount <= 0;
     if (activeFilter === 'scheduled') return false;
     return true;
   });
 
-  const activeCount = listings.filter((l) => l.remainingCount > 0 && l.status !== 'sold-out').length;
-  const soldOutCount = listings.filter((l) => l.remainingCount <= 0 || l.status === 'sold-out').length;
+  const activeCount = listings.filter((l) => l.remainingCount > 0 && !l.isPaused).length;
+  const soldOutCount = listings.filter((l) => l.remainingCount <= 0).length;
 
   return (
     <div className="space-y-4">
@@ -286,7 +289,7 @@ export default function MerchantListings({
       {/* Listings List */}
       <div className="space-y-4">
         {filteredListings.map((item, idx) => {
-          const isSoldOut = item.remainingCount <= 0 || item.status === 'sold-out';
+          const isSoldOut = item.remainingCount <= 0;
           return (
             <div
               key={item.id}

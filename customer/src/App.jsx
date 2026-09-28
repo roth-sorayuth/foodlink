@@ -392,6 +392,7 @@ export default function App() {
                 setCurrentScreen('profile');
                 setActiveBottomTab('profile');
               }}
+              onSelectListing={handleSelectListing}
             />
           )}
 

@@ -107,7 +107,7 @@ export async function createOrder(req, res) {
         update: {},
         create: {
           email: 'demo.customer@foodlink.org',
-          name: customerName || 'Sarah Jenkins',
+          name: customerName || 'Valued Customer',
           role: 'CUSTOMER',
           avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=120&q=70',
         },

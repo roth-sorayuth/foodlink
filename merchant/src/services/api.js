@@ -153,12 +153,21 @@ export async function publishListing(listingData) {
  * Update a listing (e.g. inventory, details, status)
  */
 export async function updateMerchantListing(id, updateData) {
+  const dataToSend = { ...updateData };
+  if (dataToSend.bagsAvailable !== undefined) {
+    const num = parseInt(dataToSend.bagsAvailable, 10);
+    dataToSend.bagsAvailable = num;
+    if (!dataToSend.status || dataToSend.status === 'SOLD_OUT' || dataToSend.status === 'ACTIVE') {
+      dataToSend.status = num > 0 ? 'ACTIVE' : 'SOLD_OUT';
+    }
+  }
+
   let updated = null;
   try {
     const res = await fetch(`${API_BASE_URL}/listings/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(updateData),
+      body: JSON.stringify(dataToSend),
     });
     if (res.ok) {
       const result = await res.json();
@@ -172,16 +181,20 @@ export async function updateMerchantListing(id, updateData) {
     const cached = JSON.parse(localStorage.getItem('foodlink_merchant_listings') || JSON.stringify(DEFAULT_MERCHANT_LISTINGS));
     const idx = cached.findIndex((l) => l.id === id);
     if (idx !== -1) {
-      cached[idx] = { ...cached[idx], ...updateData };
+      cached[idx] = { 
+        ...cached[idx], 
+        ...dataToSend,
+        status: dataToSend.status || (cached[idx].bagsAvailable > 0 ? 'ACTIVE' : 'SOLD_OUT')
+      };
       updated = cached[idx];
     } else {
-      updated = { id, ...updateData };
+      updated = { id, ...dataToSend };
       cached.unshift(updated);
     }
     localStorage.setItem('foodlink_merchant_listings', JSON.stringify(cached));
   } catch (e) {}
 
-  return { success: true, listing: updated || { id, ...updateData } };
+  return { success: true, listing: updated || { id, ...dataToSend } };
 }
 
 /**
