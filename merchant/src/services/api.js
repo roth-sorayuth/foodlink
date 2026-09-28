@@ -1,25 +1,40 @@
 import { io } from 'socket.io-client';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
-const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:5000';
+const isLocalhost = typeof window !== 'undefined' &&
+  (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
 
-// Global Socket.io instance for Merchant App
-export const socket = io(SOCKET_URL, {
-  autoConnect: true,
-  transports: ['websocket', 'polling'],
-});
+const API_BASE_URL = import.meta.env.VITE_API_URL || (isLocalhost ? 'http://localhost:5000/api' : '');
+const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || (isLocalhost ? 'http://localhost:5000' : '');
 
-socket.on('connect', () => {
-  console.log('[Merchant Socket] Connected to FoodLink Gateway:', socket.id);
-});
+// Global Socket.io instance for Merchant App (only if SOCKET_URL is available)
+export const socket = SOCKET_URL
+  ? io(SOCKET_URL, {
+      autoConnect: true,
+      transports: ['websocket', 'polling'],
+      timeout: 3000,
+    })
+  : { on: () => {}, off: () => {}, emit: () => {}, connected: false };
+
+if (SOCKET_URL && socket.on) {
+  socket.on('connect', () => {
+    console.log('[Merchant Socket] Connected to FoodLink Gateway:', socket.id);
+  });
+}
 
 // BroadcastChannel for instant cross-tab / cross-window sync
 const liveDropChannel = typeof window !== 'undefined' && window.BroadcastChannel
   ? new BroadcastChannel('foodlink_live_channel')
   : null;
 
+// Public Cloud Relay Channel (Connects any two devices on Vercel anywhere in the world!)
+export const CLOUD_DROPS_TOPIC = 'foodlink_cad_live_drops';
+
 /**
- * Broadcast new listing to Customer app via Socket.io, BroadcastChannel, and localStorage
+ * Broadcast new listing to Customer app via:
+ * 1. Global Cloud Pub/Sub (works on Vercel across separate phones/laptops!)
+ * 2. Socket.io (when local backend or cloud backend is running)
+ * 3. BroadcastChannel (same-origin browser tabs)
+ * 4. LocalStorage (cross-tab fallback)
  */
 export function notifyCustomerNewListing(listing) {
   if (!listing) return;
@@ -44,7 +59,18 @@ export function notifyCustomerNewListing(listing) {
     },
   };
 
-  // 1. Emit to WebSocket server so remote customer devices receive it
+  // 1. Global Cloud Broadcast (Instantly reaches customer phones on Vercel via SSE!)
+  try {
+    fetch(`https://ntfy.sh/${CLOUD_DROPS_TOPIC}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }).catch((err) => console.warn('[Cloud Broadcast] ntfy push error:', err));
+  } catch (err) {
+    // Ignore network error
+  }
+
+  // 2. Emit to WebSocket server if running
   try {
     if (socket && socket.connected) {
       socket.emit('NEW_LISTING_DROPPED', payload);
@@ -53,7 +79,7 @@ export function notifyCustomerNewListing(listing) {
     console.warn('[Merchant Socket] emit failed:', err);
   }
 
-  // 2. BroadcastChannel for instant same-origin tab sync
+  // 3. BroadcastChannel for instant same-origin tab sync
   try {
     if (liveDropChannel) {
       liveDropChannel.postMessage({ type: 'NEW_LISTING', data: payload });
@@ -62,7 +88,7 @@ export function notifyCustomerNewListing(listing) {
     console.warn('[Merchant BroadcastChannel] postMessage failed:', err);
   }
 
-  // 3. LocalStorage storage event fallback across tabs
+  // 4. LocalStorage storage event fallback across tabs
   try {
     localStorage.setItem('foodlink_last_new_listing', JSON.stringify({ ...payload, _ts: Date.now() }));
   } catch (err) {
@@ -243,24 +269,50 @@ export async function getMerchantListings() {
   const customItems = getCustomMerchantListings();
   let baseListings = DEFAULT_MERCHANT_LISTINGS;
 
+  // 1. Fetch from backend if available (with strict 1.5s timeout so hosted Vercel never hangs)
+  if (API_BASE_URL) {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 1500);
+      const res = await fetch(`${API_BASE_URL}/listings?storeId=st_cad`, { signal: controller.signal });
+      clearTimeout(timeoutId);
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data) && data.length > 0) {
+          baseListings = data.filter(
+            (item) =>
+              item.storeId === 'st_cad' ||
+              item.store?.id === 'st_cad' ||
+              (item.storeName && item.storeName.toLowerCase().includes('cad')) ||
+              (item.store?.name && item.store?.name.toLowerCase().includes('cad')) ||
+              (item.id && String(item.id).startsWith('cad-'))
+          );
+        }
+      }
+    } catch (error) {
+      console.warn('API fetch skipped or timed out, using local/custom data');
+    }
+  }
+
+  // 2. Poll cloud topic for any items published across devices on Vercel
   try {
-    const res = await fetch(`${API_BASE_URL}/listings?storeId=st_cad`);
-    if (res.ok) {
-      const data = await res.json();
-      if (Array.isArray(data) && data.length > 0) {
-        baseListings = data.filter(
-          (item) =>
-            item.storeId === 'st_cad' ||
-            item.store?.id === 'st_cad' ||
-            (item.storeName && item.storeName.toLowerCase().includes('cad')) ||
-            (item.store?.name && item.store?.name.toLowerCase().includes('cad')) ||
-            (item.id && String(item.id).startsWith('cad-'))
-        );
+    const cloudRes = await fetch(`https://ntfy.sh/${CLOUD_DROPS_TOPIC}/json?poll=1`);
+    if (cloudRes.ok) {
+      const text = await cloudRes.text();
+      const lines = text.trim().split('\n');
+      for (const line of lines) {
+        try {
+          const parsed = JSON.parse(line);
+          const rawMsg = typeof parsed.message === 'string' ? JSON.parse(parsed.message) : (parsed.message || parsed);
+          const item = rawMsg?.listing || rawMsg;
+          if (item && item.id && !customItems.some((c) => c.id === item.id)) {
+            customItems.push(item);
+            saveCustomMerchantListing(item);
+          }
+        } catch {}
       }
     }
-  } catch (error) {
-    console.warn('API error fetching listings, using defaults:', error.message);
-  }
+  } catch {}
 
   // Combine custom items with base items, custom items take precedence at top
   const allMap = new Map();
@@ -292,19 +344,26 @@ export async function getMerchantListings() {
  */
 export async function publishListing(listingData) {
   let created = null;
-  try {
-    const res = await fetch(`${API_BASE_URL}/listings`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(listingData),
-    });
 
-    if (res.ok) {
-      const result = await res.json();
-      created = result.listing || result;
+  if (API_BASE_URL) {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 1500);
+      const res = await fetch(`${API_BASE_URL}/listings`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(listingData),
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+
+      if (res.ok) {
+        const result = await res.json();
+        created = result.listing || result;
+      }
+    } catch (error) {
+      console.warn('API error publishing listing, falling back to instant cloud sync:', error.message);
     }
-  } catch (error) {
-    console.warn('API error publishing listing:', error.message);
   }
 
   if (!created) {
@@ -324,7 +383,7 @@ export async function publishListing(listingData) {
     DEFAULT_MERCHANT_LISTINGS.unshift(created);
   }
 
-  // Instantly notify Customer app
+  // Instantly notify Customer app across cloud and local
   notifyCustomerNewListing(created);
 
   return { success: true, listing: created };

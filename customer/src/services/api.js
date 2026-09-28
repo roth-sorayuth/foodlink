@@ -1,63 +1,117 @@
 import { io } from 'socket.io-client';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
-const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:5000';
+const isLocalhost = typeof window !== 'undefined' &&
+  (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
 
-// Global Socket.io instance for Customer App
-export const socket = io(SOCKET_URL, {
-  autoConnect: true,
-  transports: ['websocket', 'polling'],
-});
+const API_BASE_URL = import.meta.env.VITE_API_URL || (isLocalhost ? 'http://localhost:5000/api' : '');
+const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || (isLocalhost ? 'http://localhost:5000' : '');
+
+// Global Socket.io instance for Customer App (only if SOCKET_URL is available)
+export const socket = SOCKET_URL
+  ? io(SOCKET_URL, {
+      autoConnect: true,
+      transports: ['websocket', 'polling'],
+      timeout: 3000,
+    })
+  : { on: () => {}, off: () => {}, emit: () => {}, connected: false };
+
+if (SOCKET_URL && socket.on) {
+  socket.on('connect', () => {
+    console.log('[Customer Socket] Connected to FoodLink Backend Gateway:', socket.id);
+  });
+}
 
 // BroadcastChannel for instant cross-tab / cross-window sync
 export const liveDropChannel = typeof window !== 'undefined' && window.BroadcastChannel
   ? new BroadcastChannel('foodlink_live_channel')
   : null;
 
+// Public Cloud Relay Channel (Connects any two devices on Vercel anywhere in the world!)
+export const CLOUD_DROPS_TOPIC = 'foodlink_cad_live_drops';
+
 /**
  * Unified listener that catches new listing drops from:
- * 1. Live Socket.io websocket events
- * 2. Cross-tab BroadcastChannel
- * 3. Cross-tab LocalStorage storage events
+ * 1. Global Cloud SSE Stream (works on Vercel across separate phones/laptops!)
+ * 2. Live Socket.io websocket events
+ * 3. Cross-tab BroadcastChannel
+ * 4. Cross-tab LocalStorage storage events
  */
 export function onNewListingDrop(callback) {
   if (typeof callback !== 'function') return () => {};
 
-  // 1. Socket.io listener
-  const socketHandler = (data) => {
+  // Track seen IDs to prevent duplicate trigger if received via multiple channels
+  const seenDropIds = new Set();
+  const safeCallback = (data) => {
+    const listingId = data?.listing?.id || data?.id;
+    if (listingId) {
+      if (seenDropIds.has(listingId)) return;
+      seenDropIds.add(listingId);
+    }
     callback(data);
   };
-  socket.on('NEW_LISTING', socketHandler);
 
-  // 2. BroadcastChannel listener (cross-tab same origin)
+  // 1. Global Cloud SSE Stream (Instantly connects customer phones to merchant on Vercel!)
+  let eventSource = null;
+  try {
+    if (typeof window !== 'undefined' && window.EventSource) {
+      eventSource = new EventSource(`https://ntfy.sh/${CLOUD_DROPS_TOPIC}/sse`);
+      eventSource.onmessage = (e) => {
+        try {
+          const parsed = JSON.parse(e.data);
+          const raw = typeof parsed.message === 'string' ? JSON.parse(parsed.message) : (parsed.message || parsed);
+          if (raw && (raw.listing || raw.id)) {
+            console.log('⚡ [Customer SSE Cloud] Received live listing drop from merchant:', raw);
+            safeCallback(raw);
+          }
+        } catch (err) {
+          // Ignore heartbeats or non-JSON pings
+        }
+      };
+    }
+  } catch (err) {
+    console.warn('[Customer SSE] Init error:', err);
+  }
+
+  // 2. Socket.io listener (when local or cloud backend is running)
+  const socketHandler = (data) => {
+    safeCallback(data);
+  };
+  if (socket && socket.on) {
+    socket.on('NEW_LISTING', socketHandler);
+  }
+
+  // 3. BroadcastChannel listener (same-origin browser tabs)
   let channelHandler = null;
   if (liveDropChannel) {
     channelHandler = (event) => {
       if (event.data?.type === 'NEW_LISTING' && event.data?.data) {
-        callback(event.data.data);
+        safeCallback(event.data.data);
       }
     };
     liveDropChannel.addEventListener('message', channelHandler);
   }
 
-  // 3. LocalStorage storage event listener (cross-tab fallback)
+  // 4. LocalStorage storage event listener (cross-tab fallback)
   const storageHandler = (e) => {
     if (e.key === 'foodlink_last_new_listing' && e.newValue) {
       try {
         const parsed = JSON.parse(e.newValue);
         if (parsed && parsed.listing) {
-          callback(parsed);
+          safeCallback(parsed);
         }
-      } catch (err) {
-        // Ignore parse errors
-      }
+      } catch (err) {}
     }
   };
   window.addEventListener('storage', storageHandler);
 
   // Unsubscribe cleanup function
   return () => {
-    socket.off('NEW_LISTING', socketHandler);
+    if (eventSource) {
+      eventSource.close();
+    }
+    if (socket && socket.off) {
+      socket.off('NEW_LISTING', socketHandler);
+    }
     if (liveDropChannel && channelHandler) {
       liveDropChannel.removeEventListener('message', channelHandler);
     }
@@ -66,21 +120,57 @@ export function onNewListingDrop(callback) {
 }
 
 /**
- * Fetch all active listings from the backend database
+ * Fetch all active listings from the backend database or cloud live drops
  */
 export async function getActiveListings(category = 'all', search = '') {
-  try {
-    const params = new URLSearchParams();
-    if (category && category !== 'all') params.append('category', category);
-    if (search) params.append('search', search);
+  let backendListings = [];
 
-    const res = await fetch(`${API_BASE_URL}/listings?${params.toString()}`);
-    if (!res.ok) throw new Error('Failed to fetch listings');
-    return await res.json();
-  } catch (error) {
-    console.error('Error fetching listings:', error);
-    return [];
+  // 1. Fetch from backend if URL is configured (with 1.5s timeout so hosted site never hangs)
+  if (API_BASE_URL) {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 1500);
+      const params = new URLSearchParams();
+      if (category && category !== 'all') params.append('category', category);
+      if (search) params.append('search', search);
+
+      const res = await fetch(`${API_BASE_URL}/listings?${params.toString()}`, { signal: controller.signal });
+      clearTimeout(timeoutId);
+      if (res.ok) {
+        backendListings = await res.json();
+      }
+    } catch (error) {
+      console.warn('API listings fetch skipped or timed out, using cloud sync and fallback');
+    }
   }
+
+  // 2. Poll cloud topic for any items published across devices on Vercel
+  try {
+    const cloudRes = await fetch(`https://ntfy.sh/${CLOUD_DROPS_TOPIC}/json?poll=1`);
+    if (cloudRes.ok) {
+      const text = await cloudRes.text();
+      const lines = text.trim().split('\n');
+      const cloudItems = [];
+      for (const line of lines) {
+        try {
+          const parsed = JSON.parse(line);
+          const rawMsg = typeof parsed.message === 'string' ? JSON.parse(parsed.message) : (parsed.message || parsed);
+          const item = rawMsg?.listing || rawMsg;
+          if (item && item.id && !cloudItems.some((c) => c.id === item.id)) {
+            cloudItems.push(item);
+          }
+        } catch {}
+      }
+      if (cloudItems.length > 0) {
+        // Prepend cloud drops to backend listings
+        return [...cloudItems.reverse(), ...backendListings.filter((b) => !cloudItems.some((c) => c.id === b.id))];
+      }
+    }
+  } catch (cloudErr) {
+    // Ignore network error
+  }
+
+  return backendListings;
 }
 
 /**

@@ -19,6 +19,7 @@ import {
   getMerchantListings,
   updateMerchantListing,
   deleteMerchantListing,
+  getCustomMerchantListings,
   DEFAULT_MERCHANT_LISTINGS
 } from '../../services/api';
 
@@ -72,14 +73,15 @@ export default function MerchantListings({
     };
   };
 
-  // Listings State
-  const [listings, setListings] = useState(() =>
-    DEFAULT_MERCHANT_LISTINGS.map(normalizeMerchantItem)
-  );
+  // Listings State initialized with custom listings + defaults immediately
+  const [listings, setListings] = useState(() => {
+    const custom = getCustomMerchantListings();
+    const all = [...custom, ...DEFAULT_MERCHANT_LISTINGS.filter((d) => !custom.some((c) => c.id === d.id))];
+    return all.map(normalizeMerchantItem);
+  });
 
-  // Fetch initial listings from database
+  // Fetch updated listings from database or cloud topic
   const loadListings = async () => {
-    setIsLoading(true);
     try {
       const data = await getMerchantListings();
       if (Array.isArray(data) && data.length > 0) {
