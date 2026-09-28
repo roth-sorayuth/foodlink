@@ -6,7 +6,7 @@
  * - Isolated active pickup passes & orders
  */
 
-const USER_KEY = 'foodlink_customer_user_v2';
+const USER_KEY = 'foodlink_customer_user_v3';
 const CART_KEY_PREFIX = 'foodlink_cart_';
 const ACTIVE_ORDER_KEY_PREFIX = 'foodlink_active_order_';
 
