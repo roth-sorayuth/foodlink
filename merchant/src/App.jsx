@@ -61,7 +61,7 @@ export default function AdminApp() {
             setEditingListing(null);
             setLatestListing(newListing);
             setSubView(null);
-            setActiveTab('dashboard');
+            setActiveTab('listings');
             showToast(isEdit ? `Updated "${newListing.title}"!` : `Published "${newListing.title}"!`);
           }}
           onNavigateToProfile={() => {

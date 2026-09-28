@@ -193,8 +193,42 @@ export const DEFAULT_MERCHANT_LISTINGS = [
   },
 ];
 
+// Local persistent storage key for merchant-created/updated items
+const MERCHANT_LISTINGS_STORAGE_KEY = 'foodlink_merchant_custom_listings';
+
+export function getCustomMerchantListings() {
+  try {
+    const raw = localStorage.getItem(MERCHANT_LISTINGS_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function saveCustomMerchantListing(item) {
+  if (!item || !item.id) return;
+  try {
+    const current = getCustomMerchantListings();
+    const filtered = current.filter((l) => l.id !== item.id);
+    const updated = [item, ...filtered];
+    localStorage.setItem(MERCHANT_LISTINGS_STORAGE_KEY, JSON.stringify(updated));
+  } catch (err) {
+    console.warn('Could not save custom listing locally:', err);
+  }
+}
+
+export function removeCustomMerchantListing(id) {
+  try {
+    const current = getCustomMerchantListings();
+    const updated = current.filter((l) => l.id !== id);
+    localStorage.setItem(MERCHANT_LISTINGS_STORAGE_KEY, JSON.stringify(updated));
+  } catch (err) {
+    console.warn('Could not delete custom listing locally:', err);
+  }
+}
+
 /**
- * Fetch all listings for merchant directly from backend database
+ * Fetch all listings for merchant directly from backend database or local storage
  */
 export async function getMerchantListings() {
   const signatureOrder = [
@@ -206,24 +240,15 @@ export async function getMerchantListings() {
     'cad-coffee-pastry-pair',
   ];
 
-  const sortWithSignatureFirst = (items) => {
-    return [...items].sort((a, b) => {
-      const idxA = signatureOrder.indexOf(a.id);
-      const idxB = signatureOrder.indexOf(b.id);
-      if (idxA !== -1 && idxB !== -1) return idxA - idxB;
-      if (idxA !== -1) return -1;
-      if (idxB !== -1) return 1;
-      return 0;
-    });
-  };
+  const customItems = getCustomMerchantListings();
+  let baseListings = DEFAULT_MERCHANT_LISTINGS;
 
   try {
     const res = await fetch(`${API_BASE_URL}/listings?storeId=st_cad`);
     if (res.ok) {
       const data = await res.json();
       if (Array.isArray(data) && data.length > 0) {
-        // Filter for CAD Bakery
-        const cadItems = data.filter(
+        baseListings = data.filter(
           (item) =>
             item.storeId === 'st_cad' ||
             item.store?.id === 'st_cad' ||
@@ -231,15 +256,35 @@ export async function getMerchantListings() {
             (item.store?.name && item.store?.name.toLowerCase().includes('cad')) ||
             (item.id && String(item.id).startsWith('cad-'))
         );
-
-        return sortWithSignatureFirst(cadItems.length > 0 ? cadItems : data);
       }
     }
   } catch (error) {
     console.warn('API error fetching listings, using defaults:', error.message);
   }
 
-  return sortWithSignatureFirst(DEFAULT_MERCHANT_LISTINGS);
+  // Combine custom items with base items, custom items take precedence at top
+  const allMap = new Map();
+  customItems.forEach((it) => allMap.set(it.id, it));
+  baseListings.forEach((it) => {
+    if (!allMap.has(it.id)) allMap.set(it.id, it);
+  });
+
+  const combined = Array.from(allMap.values());
+
+  // Sort so newly created items appear at the VERY TOP, followed by signature items
+  return combined.sort((a, b) => {
+    const aIsCustom = customItems.some((c) => c.id === a.id);
+    const bIsCustom = customItems.some((c) => c.id === b.id);
+    if (aIsCustom && !bIsCustom) return -1;
+    if (!aIsCustom && bIsCustom) return 1;
+
+    const idxA = signatureOrder.indexOf(a.id);
+    const idxB = signatureOrder.indexOf(b.id);
+    if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+    if (idxA !== -1) return -1;
+    if (idxB !== -1) return 1;
+    return 0;
+  });
 }
 
 /**
@@ -264,12 +309,19 @@ export async function publishListing(listingData) {
 
   if (!created) {
     created = {
-      id: `lst-${Date.now()}`,
+      id: `cad-item-${Date.now()}`,
       ...listingData,
       bagsSold: 0,
       status: 'ACTIVE',
       createdAt: new Date().toISOString(),
     };
+  }
+
+  // Save to persistent custom merchant storage & prepend to DEFAULT_MERCHANT_LISTINGS
+  saveCustomMerchantListing(created);
+  const exists = DEFAULT_MERCHANT_LISTINGS.some((l) => l.id === created.id);
+  if (!exists) {
+    DEFAULT_MERCHANT_LISTINGS.unshift(created);
   }
 
   // Instantly notify Customer app
@@ -306,13 +358,26 @@ export async function updateMerchantListing(id, updateData) {
     console.warn('API error updating listing:', error.message);
   }
 
-  return { success: true, listing: updated || { id, ...dataToSend } };
+  const finalUpdated = updated || { id, ...dataToSend };
+  saveCustomMerchantListing(finalUpdated);
+  const defIdx = DEFAULT_MERCHANT_LISTINGS.findIndex((l) => l.id === id);
+  if (defIdx !== -1) {
+    DEFAULT_MERCHANT_LISTINGS[defIdx] = { ...DEFAULT_MERCHANT_LISTINGS[defIdx], ...dataToSend };
+  }
+
+  return { success: true, listing: finalUpdated };
 }
 
 /**
  * Delete a listing
  */
 export async function deleteMerchantListing(id) {
+  removeCustomMerchantListing(id);
+  const defIdx = DEFAULT_MERCHANT_LISTINGS.findIndex((l) => l.id === id);
+  if (defIdx !== -1) {
+    DEFAULT_MERCHANT_LISTINGS.splice(defIdx, 1);
+  }
+
   try {
     await fetch(`${API_BASE_URL}/listings/${id}`, {
       method: 'DELETE',

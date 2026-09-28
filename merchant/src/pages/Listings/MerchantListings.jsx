@@ -99,13 +99,8 @@ export default function MerchantListings({
   // Prepend newly created listing immediately if received via prop
   useEffect(() => {
     if (newListing && newListing.id) {
-      setListings((prev) => {
-        const exists = prev.some((l) => l.id === newListing.id);
-        if (!exists) {
-          return [normalizeMerchantItem(newListing.raw || newListing), ...prev];
-        }
-        return prev;
-      });
+      const normalized = normalizeMerchantItem(newListing.raw || newListing);
+      setListings((prev) => [normalized, ...prev.filter((l) => l.id !== newListing.id)]);
     }
   }, [newListing]);
 
