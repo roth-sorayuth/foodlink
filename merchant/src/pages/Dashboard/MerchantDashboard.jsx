@@ -57,6 +57,7 @@ export default function MerchantDashboard({ onNavigateToProfile, onOpenCreate, o
   // Helper to normalize DB listing to dashboard card shape
   const normalizeDashboardItem = (item) => {
     const origPriceNum = typeof item.originalPrice === 'number' ? item.originalPrice : parseFloat(item.originalPrice) || 16.0;
+    const priceNum = typeof item.price === 'number' ? item.price : parseFloat(item.price) || 4.99;
     const remaining = item.remaining !== undefined
       ? Number(item.remaining)
       : (item.bagsAvailable !== undefined 
