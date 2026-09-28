@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, Suspense, lazy } from 'react';
 import {
   LayoutGrid,
   Package,
@@ -9,14 +9,26 @@ import {
   CheckCircle2,
   X
 } from 'lucide-react';
+// Eagerly load main dashboard for instant first load
 import MerchantDashboard from './pages/Dashboard/MerchantDashboard';
-import MerchantListings from './pages/Listings/MerchantListings';
-import CreateListingPage from './pages/Listings/CreateListingPage';
-import MerchantOrders from './pages/Orders/MerchantOrders';
-import VerifyPickupPage from './pages/Orders/VerifyPickupPage';
-import MerchantAnalytics from './pages/Analytics/MerchantAnalytics';
-import MerchantProfile from './pages/StoreProfile/MerchantProfile';
 import OrderNotificationMenu from './components/common/OrderNotificationMenu';
+
+// Lazy load secondary sub-pages for reduced initial bundle and faster load
+const MerchantListings = lazy(() => import('./pages/Listings/MerchantListings'));
+const CreateListingPage = lazy(() => import('./pages/Listings/CreateListingPage'));
+const MerchantOrders = lazy(() => import('./pages/Orders/MerchantOrders'));
+const VerifyPickupPage = lazy(() => import('./pages/Orders/VerifyPickupPage'));
+const MerchantAnalytics = lazy(() => import('./pages/Analytics/MerchantAnalytics'));
+const MerchantProfile = lazy(() => import('./pages/StoreProfile/MerchantProfile'));
+
+function MerchantPageLoader() {
+  return (
+    <div className="flex flex-col items-center justify-center min-h-[45vh] py-16 space-y-3">
+      <div className="w-8 h-8 border-3 border-[#2E7D32] border-t-transparent rounded-full animate-spin" />
+      <span className="text-xs font-semibold text-stone-500">Loading...</span>
+    </div>
+  );
+}
 
 export default function AdminApp() {
   const [activeTab, setActiveTab] = useState('dashboard'); // 'dashboard' | 'listings' | 'orders' | 'insights' | 'profile'
@@ -38,25 +50,27 @@ export default function AdminApp() {
   // If subView is create-listing
   if (subView === 'create-listing') {
     return (
-      <CreateListingPage
-        initialListing={editingListing}
-        onBack={() => {
-          setEditingListing(null);
-          setSubView(null);
-        }}
-        onSave={(newListing, isEdit) => {
-          setEditingListing(null);
-          setLatestListing(newListing);
-          setSubView(null);
-          setActiveTab('listings');
-          showToast(isEdit ? `Updated "${newListing.title}"!` : `Published "${newListing.title}"!`);
-        }}
-        onNavigateToProfile={() => {
-          setEditingListing(null);
-          setSubView(null);
-          setActiveTab('profile');
-        }}
-      />
+      <Suspense fallback={<MerchantPageLoader />}>
+        <CreateListingPage
+          initialListing={editingListing}
+          onBack={() => {
+            setEditingListing(null);
+            setSubView(null);
+          }}
+          onSave={(newListing, isEdit) => {
+            setEditingListing(null);
+            setLatestListing(newListing);
+            setSubView(null);
+            setActiveTab('dashboard');
+            showToast(isEdit ? `Updated "${newListing.title}"!` : `Published "${newListing.title}"!`);
+          }}
+          onNavigateToProfile={() => {
+            setEditingListing(null);
+            setSubView(null);
+            setActiveTab('profile');
+          }}
+        />
+      </Suspense>
     );
   }
 
@@ -80,7 +94,9 @@ export default function AdminApp() {
           </button>
         </div>
 
-        <MerchantProfile onNavigateToDashboard={() => setActiveTab('dashboard')} />
+        <Suspense fallback={<MerchantPageLoader />}>
+          <MerchantProfile onNavigateToDashboard={() => setActiveTab('dashboard')} />
+        </Suspense>
       </div>
     );
   }
@@ -150,78 +166,77 @@ export default function AdminApp() {
 
       {/* Main Responsive Canvas */}
       <main className="max-w-md sm:max-w-xl md:max-w-2xl lg:max-w-3xl mx-auto w-full px-3.5 sm:px-6 py-4">
-        
-        {/* SubView: Verify Pickup */}
-        {subView === 'verify-pickup' ? (
-          <VerifyPickupPage
-            initialCode={verificationCode}
-            onBack={() => {
-              setSubView(null);
-              setVerificationCode(null);
-            }}
-            onCompleteHandover={(data) => {
-              setSubView(null);
-              setVerificationCode(null);
-              setHasPendingPickups(false);
-            }}
-          />
-        ) : (
-          <>
-            {/* Tab 1: Dashboard */}
-            {activeTab === 'dashboard' && (
-              <MerchantDashboard
-                onNavigateToProfile={() => setActiveTab('profile')}
-                onOpenCreate={() => {
-                  setEditingListing(null);
-                  setSubView('create-listing');
-                }}
-                onOpenVerify={() => setSubView('verify-pickup')}
-                onEditListing={(item) => {
-                  setEditingListing(item.raw || item);
-                  setSubView('create-listing');
-                }}
-              />
-            )}
+        <Suspense fallback={<MerchantPageLoader />}>
+          {/* SubView: Verify Pickup */}
+          {subView === 'verify-pickup' ? (
+            <VerifyPickupPage
+              initialCode={verificationCode}
+              onBack={() => {
+                setSubView(null);
+                setVerificationCode(null);
+              }}
+              onCompleteHandover={(data) => {
+                setSubView(null);
+                setVerificationCode(null);
+                setHasPendingPickups(false);
+              }}
+            />
+          ) : (
+            <>
+              {/* Tab 1: Dashboard */}
+              {activeTab === 'dashboard' && (
+                <MerchantDashboard
+                  newListing={latestListing}
+                  onNavigateToProfile={() => setActiveTab('profile')}
+                  onOpenCreate={() => setActiveTab('listings')}
+                  onNavigateToListings={() => setActiveTab('listings')}
+                  onOpenVerify={() => setSubView('verify-pickup')}
+                  onEditListing={(item) => {
+                    setEditingListing(item.raw || item);
+                    setSubView('create-listing');
+                  }}
+                />
+              )}
 
-            {/* Tab 2: Listings */}
-            {activeTab === 'listings' && (
-              <MerchantListings
-                newListing={latestListing}
-                onOpenCreate={() => {
-                  setEditingListing(null);
-                  setSubView('create-listing');
-                }}
-                onEditListing={(item) => {
-                  setEditingListing(item.raw || item);
-                  setSubView('create-listing');
-                }}
-                onNavigateToProfile={() => setActiveTab('profile')}
-              />
-            )}
+              {/* Tab 2: Listings */}
+              {activeTab === 'listings' && (
+                <MerchantListings
+                  newListing={latestListing}
+                  onOpenCreate={() => {
+                    setEditingListing(null);
+                    setSubView('create-listing');
+                  }}
+                  onEditListing={(item) => {
+                    setEditingListing(item.raw || item);
+                    setSubView('create-listing');
+                  }}
+                  onNavigateToProfile={() => setActiveTab('profile')}
+                />
+              )}
 
-            {/* Tab 3: Orders */}
-            {activeTab === 'orders' && (
-              <MerchantOrders
-                onOpenVerify={() => setSubView('verify-pickup')}
-                onNavigateToProfile={() => setActiveTab('profile')}
-                onConfirmPickup={(remainingCount) => {
-                  setHasPendingPickups(remainingCount > 0);
-                }}
-                onPendingOrdersChange={(count) => {
-                  setHasPendingPickups(count > 0);
-                }}
-              />
-            )}
+              {/* Tab 3: Orders */}
+              {activeTab === 'orders' && (
+                <MerchantOrders
+                  onOpenVerify={() => setSubView('verify-pickup')}
+                  onNavigateToProfile={() => setActiveTab('profile')}
+                  onConfirmPickup={(remainingCount) => {
+                    setHasPendingPickups(remainingCount > 0);
+                  }}
+                  onPendingOrdersChange={(count) => {
+                    setHasPendingPickups(count > 0);
+                  }}
+                />
+              )}
 
-            {/* Tab 4: Insights */}
-            {activeTab === 'insights' && (
-              <MerchantAnalytics
-                onNavigateToProfile={() => setActiveTab('profile')}
-              />
-            )}
-          </>
-        )}
-
+              {/* Tab 4: Insights */}
+              {activeTab === 'insights' && (
+                <MerchantAnalytics
+                  onNavigateToProfile={() => setActiveTab('profile')}
+                />
+              )}
+            </>
+          )}
+        </Suspense>
       </main>
 
       {/* Fixed Bottom Navigation Bar (4 Main Tabs) */}

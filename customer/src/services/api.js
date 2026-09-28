@@ -36,14 +36,49 @@ export async function getActiveListings(category = 'all', search = '') {
 }
 
 /**
- * Place order / reserve a surplus bag (Customer only)
+ * Place order / reserve one or multiple surplus bags (Customer only)
  */
-export async function reserveListing(listingId, quantity = 1) {
+export async function reserveListing(target, maybeQuantity = 1, maybeUser = {}) {
   try {
+    let payload = {};
+
+    // Support both reserveListing({ items, user }) and reserveListing(listingId, quantity, user)
+    if (typeof target === 'object' && target !== null && !target.id) {
+      const { listingId, items = [], quantity = 1, user = {} } = target;
+      payload.userId = user.id;
+      payload.customerName = user.name;
+      payload.customerEmail = user.email;
+      payload.avatarUrl = user.avatar;
+
+      if (Array.isArray(items) && items.length > 0) {
+        payload.items = items.map((it) => ({
+          listingId: it.listing?.id || it.listingId || it.id,
+          quantity: it.quantity || 1,
+          title: it.listing?.title || it.title,
+          price: typeof it.listing?.price === 'number' ? it.listing.price : parseFloat(String(it.listing?.price || '4.99').replace(/[^0-9.]/g, '')) || 4.99,
+          photoUrl: it.listing?.image || it.photoUrl,
+        }));
+      } else if (listingId) {
+        payload.listingId = listingId;
+        payload.quantity = quantity;
+      }
+    } else {
+      const listingId = typeof target === 'object' ? target.id : target;
+      const user = maybeUser || {};
+      payload = {
+        listingId,
+        quantity: maybeQuantity || 1,
+        userId: user.id,
+        customerName: user.name,
+        customerEmail: user.email,
+        avatarUrl: user.avatar,
+      };
+    }
+
     const res = await fetch(`${API_BASE_URL}/orders`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ listingId, quantity }),
+      body: JSON.stringify(payload),
     });
     if (!res.ok) {
       const err = await res.json();

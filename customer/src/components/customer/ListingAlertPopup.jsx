@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Bell, Sparkles, X, ChevronRight, ShoppingBag, Clock, ShieldCheck } from 'lucide-react';
+import OptimizedImage from '../common/OptimizedImage';
 
 export default function ListingAlertPopup({ alertData, onView, onClose }) {
   const [progress, setProgress] = useState(100);
@@ -63,12 +64,17 @@ export default function ListingAlertPopup({ alertData, onView, onClose }) {
       <div className="flex items-center gap-3.5 py-3">
         {/* Thumbnail */}
         <div className="relative w-16 h-16 sm:w-20 sm:h-20 rounded-2xl overflow-hidden bg-stone-100 shrink-0 border border-stone-200/80 shadow-xs">
-          <img
+          <OptimizedImage
             src={photoUrl}
             alt={title}
+            width={160}
+            height={160}
+            quality={70}
+            priority={true}
             className="w-full h-full object-cover"
+            containerClassName="w-full h-full"
           />
-          <span className="absolute bottom-1 right-1 px-1.5 py-0.5 rounded-md bg-stone-900/80 text-white text-[9px] font-bold">
+          <span className="absolute bottom-1 right-1 px-1.5 py-0.5 rounded-md bg-stone-900/80 text-white text-[9px] font-bold z-10">
             {bags} left
           </span>
         </div>

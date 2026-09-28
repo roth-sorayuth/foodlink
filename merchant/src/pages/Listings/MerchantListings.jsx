@@ -173,11 +173,14 @@ export default function MerchantListings({
   };
 
   const filteredListings = listings.filter((item) => {
-    if (activeFilter === 'active') return item.status === 'active';
-    if (activeFilter === 'sold-out') return item.status === 'sold-out';
+    if (activeFilter === 'active') return true; // Show all items in main management feed; sold out ones appear in black & white
+    if (activeFilter === 'sold-out') return item.remainingCount <= 0 || item.status === 'sold-out';
     if (activeFilter === 'scheduled') return false;
     return true;
   });
+
+  const activeCount = listings.filter((l) => l.remainingCount > 0 && l.status !== 'sold-out').length;
+  const soldOutCount = listings.filter((l) => l.remainingCount <= 0 || l.status === 'sold-out').length;
 
   return (
     <div className="space-y-4">
@@ -243,7 +246,7 @@ export default function MerchantListings({
               : 'bg-stone-100 hover:bg-stone-200 text-stone-600'
           }`}
         >
-          Active 3
+          All Items ({listings.length})
         </button>
 
         <button
@@ -265,7 +268,7 @@ export default function MerchantListings({
               : 'bg-stone-100 hover:bg-stone-200 text-stone-600'
           }`}
         >
-          Sold Out 2
+          Sold Out ({soldOutCount})
         </button>
 
         <button
@@ -282,198 +285,183 @@ export default function MerchantListings({
 
       {/* Listings List */}
       <div className="space-y-4">
-        {filteredListings.map((item, idx) => (
-          <div
-            key={item.id}
-            style={{ animationDelay: `${idx * 80}ms` }}
-            className="bg-white rounded-3xl border border-stone-200/80 overflow-hidden interactive-card group shadow-2xs hover:border-emerald-300/80"
-          >
-            {/* Banner Image with Overlays */}
-            <div className="relative h-44 sm:h-52 w-full overflow-hidden bg-stone-100">
-              <img src={item.image} alt={item.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ease-out" />
+        {filteredListings.map((item, idx) => {
+          const isSoldOut = item.remainingCount <= 0 || item.status === 'sold-out';
+          return (
+            <div
+              key={item.id}
+              style={{ animationDelay: `${idx * 80}ms` }}
+              className={`bg-white rounded-3xl border overflow-hidden interactive-card group shadow-2xs transition-all duration-300 ${
+                isSoldOut
+                  ? 'border-stone-300/80 bg-stone-50/60'
+                  : 'border-stone-200/80 hover:border-emerald-300/80'
+              }`}
+            >
+              {/* Banner Image with Overlays */}
+              <div className={`relative h-44 sm:h-52 w-full overflow-hidden bg-stone-100 transition-all duration-300 ${isSoldOut ? 'grayscale contrast-75' : ''}`}>
+                <img
+                  src={item.image}
+                  alt={item.title}
+                  loading="lazy"
+                  decoding="async"
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ease-out"
+                />
 
-              {/* Status badges */}
-              <div className="absolute top-3 left-3 flex items-center gap-1.5">
-                {item.status === 'active' ? (
-                  <span className="px-2.5 py-1 rounded-full bg-[#1b5e20] text-white text-xs font-bold shadow-xs flex items-center gap-1.5 group-hover:scale-105 transition-transform">
-                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                    <span>{item.liveTag}</span>
-                  </span>
-                ) : (
-                  <span className="px-2.5 py-1 rounded-full bg-stone-800/90 text-white text-xs font-bold shadow-xs flex items-center gap-1">
-                    <CheckCircle2 className="w-3 h-3 text-emerald-400" />
-                    <span>{item.liveTag}</span>
-                  </span>
-                )}
-              </div>
-
-              {item.stockTag && (
-                <div className="absolute top-3 right-3">
-                  <span className="px-2.5 py-1 rounded-full bg-orange-500 text-white text-xs font-bold shadow-xs flex items-center gap-1">
-                    🔥 {item.stockTag}
-                  </span>
-                </div>
-              )}
-
-              {/* Floating Bottom Details on Image */}
-              <div className="absolute bottom-3 inset-x-3 flex items-end justify-between text-white drop-shadow-md">
-                <div>
-                  <h3 className="font-extrabold text-base sm:text-lg leading-tight text-white">{item.title}</h3>
-                  <p className="text-xs text-white/90 font-medium">{item.subtitle}</p>
-                </div>
-                <div className="text-right">
-                  <span className="font-black text-xl text-white block leading-tight">{item.price}</span>
-                  {item.originalPrice && (
-                    <span className="text-xs text-white/80 line-through">{item.originalPrice}</span>
+                {/* Status badges */}
+                <div className="absolute top-3 left-3 flex items-center gap-1.5">
+                  {!isSoldOut ? (
+                    <span className="px-2.5 py-1 rounded-full bg-[#1b5e20] text-white text-xs font-bold shadow-xs flex items-center gap-1.5 group-hover:scale-105 transition-transform">
+                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                      <span>{item.liveTag}</span>
+                    </span>
+                  ) : (
+                    <span className="px-2.5 py-1 rounded-full bg-stone-900/90 text-white text-xs font-bold shadow-xs flex items-center gap-1.5 backdrop-blur-xs">
+                      <span className="w-2 h-2 rounded-full bg-stone-400" />
+                      <span>Sold Out • Edit to Restock</span>
+                    </span>
                   )}
                 </div>
+
+                {item.stockTag && !isSoldOut && (
+                  <div className="absolute top-3 right-3">
+                    <span className="px-2.5 py-1 rounded-full bg-orange-500 text-white text-xs font-bold shadow-xs flex items-center gap-1">
+                      🔥 {item.stockTag}
+                    </span>
+                  </div>
+                )}
+
+                {/* Floating Bottom Details on Image */}
+                <div className="absolute bottom-3 inset-x-3 flex items-end justify-between text-white drop-shadow-md">
+                  <div>
+                    <h3 className="font-extrabold text-base sm:text-lg leading-tight text-white">{item.title}</h3>
+                    <p className="text-xs text-white/90 font-medium">{item.subtitle}</p>
+                  </div>
+                  <div className="text-right">
+                    <span className="font-black text-xl text-white block leading-tight">{item.price}</span>
+                    {item.originalPrice && (
+                      <span className="text-xs text-white/80 line-through">{item.originalPrice}</span>
+                    )}
+                  </div>
+                </div>
               </div>
-            </div>
 
-            {/* Inner Content */}
-            <div className="p-4 sm:p-5 space-y-3">
-              
-              {/* Active Item Details */}
-              {item.status === 'active' ? (
-                <>
-                  {/* Stock remaining meter */}
-                  <div className="space-y-1.5">
-                    <div className="flex items-center justify-between text-xs font-semibold">
-                      <div className="flex items-center gap-1 text-stone-700">
-                        <Package className="w-3.5 h-3.5 text-stone-500" />
-                        <span>Stock: {item.soldCount} Sold</span>
-                      </div>
-                      <span className={item.remainingCount <= 2 ? 'text-[#D96B1C] font-bold' : 'text-stone-600'}>
-                        {item.remainingCount} of {item.totalCount} remaining
-                      </span>
+              {/* Inner Content */}
+              <div className="p-4 sm:p-5 space-y-3">
+                {/* Stock remaining meter */}
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between text-xs font-semibold">
+                    <div className="flex items-center gap-1 text-stone-700">
+                      <Package className="w-3.5 h-3.5 text-stone-500" />
+                      <span>Stock: {item.soldCount} Sold</span>
                     </div>
-
-                    <div className="w-full h-2 bg-stone-100 rounded-full overflow-hidden">
-                      <div
-                        className={`h-full rounded-full ${
-                          item.remainingCount <= 2 ? 'bg-[#FF8A3D]' : 'bg-[#2E7D32]'
-                        }`}
-                        style={{ width: `${(item.soldCount / item.totalCount) * 100}%` }}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Metrics Row: Earned & Pickup Window */}
-                  <div className="grid grid-cols-2 gap-3 pt-1">
-                    <div className="p-2.5 rounded-2xl bg-stone-50 border border-stone-200/70 flex items-center gap-2.5">
-                      <div className="w-7 h-7 rounded-xl bg-emerald-100 text-[#2E7D32] flex items-center justify-center">
-                        <DollarSign className="w-4 h-4" />
-                      </div>
-                      <div>
-                        <span className="text-[10px] text-stone-400 block font-medium">Earned</span>
-                        <span className="font-extrabold text-xs text-[#1C1C1E]">{item.earned}</span>
-                      </div>
-                    </div>
-
-                    <div className="p-2.5 rounded-2xl bg-stone-50 border border-stone-200/70 flex items-center gap-2.5">
-                      <div className="w-7 h-7 rounded-xl bg-orange-100 text-[#D96B1C] flex items-center justify-center">
-                        <Clock className="w-4 h-4" />
-                      </div>
-                      <div>
-                        <span className="text-[10px] text-stone-400 block font-medium">Pickup Today</span>
-                        <span className="font-bold text-xs text-[#1C1C1E]">{item.pickupWindow}</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Actions & Stepper Row */}
-                  <div className="flex items-center justify-between pt-2 border-t border-stone-100">
-                    {/* Stepper */}
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => updateRemaining(item.id, -1)}
-                        className="w-8 h-8 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 flex items-center justify-center transition-colors active:scale-95"
-                      >
-                        <Minus className="w-3.5 h-3.5" />
-                      </button>
-                      <span className="font-extrabold text-sm text-[#1C1C1E] w-5 text-center">
-                        {item.remainingCount}
-                      </span>
-                      <button
-                        onClick={() => updateRemaining(item.id, 1)}
-                        className="w-8 h-8 rounded-xl bg-emerald-100 hover:bg-emerald-200 text-[#2E7D32] flex items-center justify-center transition-colors active:scale-95"
-                      >
-                        <Plus className="w-3.5 h-3.5 stroke-[3]" />
-                      </button>
-                    </div>
-
-                    {/* Pause, Edit, Delete */}
-                    <div className="flex items-center gap-1.5">
-                      <button
-                        onClick={() => togglePause(item.id)}
-                        className={`px-3 py-1.5 rounded-xl text-xs font-semibold border flex items-center gap-1.5 transition-colors ${
-                          item.isPaused
-                            ? 'bg-amber-100 text-amber-800 border-amber-300'
-                            : 'bg-stone-50 hover:bg-stone-100 text-stone-700 border-stone-200'
-                        }`}
-                      >
-                        <span className={`w-1.5 h-1.5 rounded-full ${item.isPaused ? 'bg-amber-600' : 'bg-[#2E7D32]'}`} />
-                        <span>{item.isPaused ? 'Paused' : 'Pause'}</span>
-                      </button>
-
-                      <button
-                        onClick={() => onEditListing && onEditListing(item)}
-                        className="w-8 h-8 rounded-xl bg-stone-50 hover:bg-stone-100 text-stone-600 border border-stone-200 flex items-center justify-center transition-colors"
-                      >
-                        <Edit2 className="w-3.5 h-3.5" />
-                      </button>
-
-                      <button
-                        onClick={async () => {
-                          const confirmDelete = window.confirm(`Are you sure you want to remove "${item.title}"?`);
-                          if (!confirmDelete) return;
-                          try {
-                            await deleteMerchantListing(item.id);
-                            setListings((prev) => prev.filter((l) => l.id !== item.id));
-                            showToast(`Removed "${item.title}"`);
-                          } catch (err) {
-                            showToast(`Failed to delete listing: ${err.message}`);
-                          }
-                        }}
-                        className="w-8 h-8 rounded-xl bg-stone-50 hover:bg-rose-50 text-stone-400 hover:text-rose-600 border border-stone-200 flex items-center justify-center transition-colors cursor-pointer"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  </div>
-                </>
-              ) : (
-                /* Sold Out Item Details */
-                <div className="space-y-3">
-                  <div className="p-3 rounded-2xl bg-stone-50 border border-stone-200/80 flex items-center justify-between">
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-7 h-7 rounded-xl bg-emerald-100 text-[#2E7D32] flex items-center justify-center">
-                        <CheckCircle2 className="w-4 h-4" />
-                      </div>
-                      <div>
-                        <span className="text-[10px] text-stone-400 block font-medium">Finished at {item.finishedTime}</span>
-                        <span className="font-extrabold text-xs text-[#1C1C1E]">Total Earned: {item.earned}</span>
-                      </div>
-                    </div>
-
-                    <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-[#2E7D32] text-[10px] font-extrabold uppercase">
-                      100% Rescued
+                    <span className={isSoldOut ? 'text-stone-500 font-bold' : (item.remainingCount <= 2 ? 'text-[#D96B1C] font-bold' : 'text-stone-600')}>
+                      {isSoldOut ? '0 remaining (Sold Out)' : `${item.remainingCount} of ${item.totalCount} remaining`}
                     </span>
                   </div>
 
-                  <button
-                    onClick={() => relistItem(item)}
-                    className="w-full py-2.5 rounded-2xl bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-bold flex items-center justify-center gap-2 transition-colors cursor-pointer"
-                  >
-                    <RotateCcw className="w-3.5 h-3.5" />
-                    <span>Relist for Tomorrow</span>
-                  </button>
+                  <div className="w-full h-2 bg-stone-100 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all duration-300 ${
+                        isSoldOut ? 'bg-stone-300' : (item.remainingCount <= 2 ? 'bg-[#FF8A3D]' : 'bg-[#2E7D32]')
+                      }`}
+                      style={{ width: isSoldOut ? '100%' : `${(item.soldCount / item.totalCount) * 100}%` }}
+                    />
+                  </div>
                 </div>
-              )}
 
+                {/* Metrics Row: Earned & Pickup Window */}
+                <div className="grid grid-cols-2 gap-3 pt-1">
+                  <div className="p-2.5 rounded-2xl bg-stone-50 border border-stone-200/70 flex items-center gap-2.5">
+                    <div className={`w-7 h-7 rounded-xl flex items-center justify-center ${isSoldOut ? 'bg-stone-200 text-stone-600' : 'bg-emerald-100 text-[#2E7D32]'}`}>
+                      <DollarSign className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-stone-400 block font-medium">Earned</span>
+                      <span className="font-extrabold text-xs text-[#1C1C1E]">{item.earned}</span>
+                    </div>
+                  </div>
+
+                  <div className="p-2.5 rounded-2xl bg-stone-50 border border-stone-200/70 flex items-center gap-2.5">
+                    <div className={`w-7 h-7 rounded-xl flex items-center justify-center ${isSoldOut ? 'bg-stone-200 text-stone-600' : 'bg-orange-100 text-[#D96B1C]'}`}>
+                      <Clock className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-stone-400 block font-medium">Pickup Today</span>
+                      <span className="font-bold text-xs text-[#1C1C1E]">{item.pickupWindow}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Actions & Stepper Row - ALWAYS ACCESSIBLE */}
+                <div className="flex items-center justify-between pt-2 border-t border-stone-100">
+                  {/* Stepper with + to restock */}
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => updateRemaining(item.id, -1)}
+                      disabled={item.remainingCount <= 0}
+                      className="w-8 h-8 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center transition-colors active:scale-95 cursor-pointer"
+                      title="Decrease stock"
+                    >
+                      <Minus className="w-3.5 h-3.5" />
+                    </button>
+                    <span className={`font-extrabold text-sm w-5 text-center ${isSoldOut ? 'text-stone-400 font-mono' : 'text-[#1C1C1E]'}`}>
+                      {item.remainingCount}
+                    </span>
+                    <button
+                      onClick={() => updateRemaining(item.id, 1)}
+                      className="w-8 h-8 rounded-xl bg-emerald-100 hover:bg-emerald-200 text-[#2E7D32] flex items-center justify-center transition-colors active:scale-95 cursor-pointer"
+                      title="Increase stock / Restock"
+                    >
+                      <Plus className="w-3.5 h-3.5 stroke-[3]" />
+                    </button>
+                  </div>
+
+                  {/* Pause, Edit, Delete */}
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      onClick={() => togglePause(item.id)}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-semibold border flex items-center gap-1.5 transition-colors cursor-pointer ${
+                        item.isPaused
+                          ? 'bg-amber-100 text-amber-800 border-amber-300'
+                          : 'bg-stone-50 hover:bg-stone-100 text-stone-700 border-stone-200'
+                      }`}
+                    >
+                      <span className={`w-1.5 h-1.5 rounded-full ${item.isPaused ? 'bg-amber-600' : 'bg-[#2E7D32]'}`} />
+                      <span>{item.isPaused ? 'Paused' : 'Pause'}</span>
+                    </button>
+
+                    <button
+                      onClick={() => onEditListing && onEditListing(item)}
+                      className="w-8 h-8 rounded-xl bg-stone-50 hover:bg-stone-100 text-stone-700 border border-stone-200 flex items-center justify-center transition-colors cursor-pointer"
+                      title="Edit bag details"
+                    >
+                      <Edit2 className="w-3.5 h-3.5" />
+                    </button>
+
+                    <button
+                      onClick={async () => {
+                        const confirmDelete = window.confirm(`Are you sure you want to remove "${item.title}"?`);
+                        if (!confirmDelete) return;
+                        try {
+                          await deleteMerchantListing(item.id);
+                          setListings((prev) => prev.filter((l) => l.id !== item.id));
+                          showToast(`Removed "${item.title}"`);
+                        } catch (err) {
+                          showToast(`Failed to delete listing: ${err.message}`);
+                        }
+                      }}
+                      className="w-8 h-8 rounded-xl bg-stone-50 hover:bg-rose-50 text-stone-400 hover:text-rose-600 border border-stone-200 flex items-center justify-center transition-colors cursor-pointer"
+                      title="Delete bag"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
     </div>

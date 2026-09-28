@@ -13,6 +13,7 @@ import {
   ShieldCheck,
   Filter
 } from 'lucide-react';
+import OptimizedImage from '../common/OptimizedImage';
 
 export default function CustomerNotificationsModal({
   isOpen,
@@ -191,7 +192,15 @@ export default function CustomerNotificationsModal({
                     <div className="relative shrink-0">
                       {photo ? (
                         <div className="w-11 h-11 rounded-xl overflow-hidden bg-stone-100 border border-stone-200 shadow-2xs">
-                          <img src={photo} alt="" className="w-full h-full object-cover" />
+                          <OptimizedImage
+                            src={photo}
+                            alt=""
+                            width={88}
+                            height={88}
+                            quality={70}
+                            className="w-full h-full object-cover"
+                            containerClassName="w-full h-full"
+                          />
                         </div>
                       ) : (
                         <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${

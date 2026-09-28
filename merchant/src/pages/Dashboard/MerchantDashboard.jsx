@@ -28,7 +28,7 @@ import {
 import { getMerchantListings, verifyOrderPickup, DEFAULT_MERCHANT_LISTINGS } from '../../services/api';
 import { socket } from '../../services/socket';
 
-export default function MerchantDashboard({ onNavigateToProfile, onOpenCreate, onOpenVerify, onEditListing }) {
+export default function MerchantDashboard({ onNavigateToProfile, onOpenCreate, onOpenVerify, onEditListing, newListing, onNavigateToListings }) {
   // Store Operational State
   const [isOpen, setIsOpen] = useState(true);
   const [acceptingRescues, setAcceptingRescues] = useState(true);
@@ -56,26 +56,29 @@ export default function MerchantDashboard({ onNavigateToProfile, onOpenCreate, o
   const normalizeDashboardItem = (item) => {
     const origPriceNum = typeof item.originalPrice === 'number' ? item.originalPrice : parseFloat(item.originalPrice) || 16.0;
     const priceNum = typeof item.price === 'number' ? item.price : parseFloat(item.price) || 4.99;
-    const remaining = item.bagsAvailable !== undefined ? item.bagsAvailable : (item.remainingCount || 2);
+    const remaining = item.bagsAvailable !== undefined ? item.bagsAvailable : (item.remainingCount !== undefined ? item.remainingCount : 2);
     const sold = item.bagsSold !== undefined ? item.bagsSold : (item.soldCount || 4);
     const total = remaining + sold;
-    const claimedPercent = total > 0 ? Math.round((sold / total) * 100) : 0;
+    const claimedPercent = total > 0 ? Math.round((sold / total) * 100) : 100;
+    const isSoldOut = remaining <= 0 || item.status === 'SOLD_OUT' || item.status === 'Sold Out';
 
     return {
       id: item.id,
       title: item.title,
       description: item.description || "Assortment of today's fresh surplus food items.",
       image: item.photoUrl || item.image || 'https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=700&q=80',
-      status: item.status === 'ACTIVE' || item.status === 'Active' ? 'Active' : 'Sold Out',
-      tagText: remaining <= 2 ? `${remaining} left!` : `${remaining} left`,
-      tagColor: remaining <= 2 ? 'bg-amber-500 text-white' : 'bg-stone-800 text-white',
+      status: isSoldOut ? 'Sold Out' : 'Active',
+      isSoldOut,
+      remainingCount: remaining,
+      tagText: isSoldOut ? 'Sold Out' : (remaining <= 2 ? `${remaining} left!` : `${remaining} left`),
+      tagColor: isSoldOut ? 'bg-stone-900 text-stone-300' : (remaining <= 2 ? 'bg-amber-500 text-white' : 'bg-stone-800 text-white'),
       pickupWindow: `Pickup ${item.pickupStart || '6:30 PM'} - ${item.pickupEnd || '7:30 PM'}`,
       price: `$${priceNum.toFixed(2)}`,
       originalValue: `$${origPriceNum.toFixed(2)} value`,
       soldCount: sold,
       totalCount: total,
       claimedPercent,
-      progressColor: claimedPercent >= 75 ? 'bg-amber-500' : 'bg-[#2E7D32]',
+      progressColor: isSoldOut ? 'bg-stone-300' : (claimedPercent >= 75 ? 'bg-amber-500' : 'bg-[#2E7D32]'),
       raw: item,
     };
   };
@@ -98,6 +101,19 @@ export default function MerchantDashboard({ onNavigateToProfile, onOpenCreate, o
   useEffect(() => {
     loadDashboardListings();
   }, []);
+
+  // Prepend or update listing immediately if received via prop
+  useEffect(() => {
+    if (newListing && newListing.id) {
+      setListings((prev) => {
+        const exists = prev.some((l) => l.id === newListing.id);
+        if (!exists) {
+          return [normalizeDashboardItem(newListing.raw || newListing), ...prev];
+        }
+        return prev.map((l) => (l.id === newListing.id ? normalizeDashboardItem(newListing.raw || newListing) : l));
+      });
+    }
+  }, [newListing]);
 
   // Real-time listener for incoming orders & newly created listings
   useEffect(() => {
@@ -386,7 +402,7 @@ export default function MerchantDashboard({ onNavigateToProfile, onOpenCreate, o
             className="w-full py-3.5 rounded-2xl bg-[#2E7D32] hover:bg-[#256629] text-white font-bold text-sm flex items-center justify-center gap-2 shadow-sm transition-all active:scale-[0.99] cursor-pointer"
           >
             <Plus className="w-4 h-4 stroke-[3]" />
-            <span>+ Create New Bag</span>
+            <span>Create New Bag</span>
           </button>
 
           {/* Scan Pickup Code button */}
@@ -414,10 +430,13 @@ export default function MerchantDashboard({ onNavigateToProfile, onOpenCreate, o
               </span>
             </div>
             <button 
-              onClick={() => showToast('Opening all 3 listings management')}
-              className="text-xs font-bold text-[#2E7D32] hover:underline flex items-center gap-0.5"
+              onClick={() => {
+                if (onNavigateToListings) onNavigateToListings();
+                else if (onOpenCreate) onOpenCreate();
+              }}
+              className="text-xs font-bold text-[#2E7D32] hover:underline flex items-center gap-0.5 cursor-pointer"
             >
-              <span>View All (3)</span>
+              <span>View All ({listings.length})</span>
               <span className="text-sm">›</span>
             </button>
           </div>
@@ -428,22 +447,35 @@ export default function MerchantDashboard({ onNavigateToProfile, onOpenCreate, o
               <div 
                 key={item.id}
                 style={{ animationDelay: `${idx * 80}ms` }}
-                className="bg-white rounded-3xl border border-stone-200/80 overflow-hidden interactive-card group shadow-2xs hover:border-emerald-300/80 cursor-pointer"
+                className={`bg-white rounded-3xl border overflow-hidden interactive-card group shadow-2xs transition-all duration-300 cursor-pointer ${
+                  item.isSoldOut
+                    ? 'border-stone-300/80 bg-stone-50/60'
+                    : 'border-stone-200/80 hover:border-emerald-300/80'
+                }`}
               >
                 {/* Image Banner */}
-                <div className="relative h-44 sm:h-52 w-full overflow-hidden bg-stone-100">
+                <div className={`relative h-44 sm:h-52 w-full overflow-hidden bg-stone-100 transition-all duration-300 ${item.isSoldOut ? 'grayscale contrast-75' : ''}`}>
                   <img 
                     src={item.image} 
                     alt={item.title}
+                    loading="lazy"
+                    decoding="async"
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ease-out"
                   />
 
                   {/* Top Floating Badges */}
                   <div className="absolute top-3 left-3 flex items-center gap-1.5">
-                    <span className="px-2.5 py-1 rounded-full bg-white/95 text-[#2E7D32] text-xs font-bold shadow-xs flex items-center gap-1.5 backdrop-blur-xs group-hover:scale-105 transition-transform">
-                      <span className="w-2 h-2 rounded-full bg-[#2E7D32] animate-pulse" />
-                      Active
-                    </span>
+                    {!item.isSoldOut ? (
+                      <span className="px-2.5 py-1 rounded-full bg-white/95 text-[#2E7D32] text-xs font-bold shadow-xs flex items-center gap-1.5 backdrop-blur-xs group-hover:scale-105 transition-transform">
+                        <span className="w-2 h-2 rounded-full bg-[#2E7D32] animate-pulse" />
+                        Active
+                      </span>
+                    ) : (
+                      <span className="px-2.5 py-1 rounded-full bg-stone-900/90 text-stone-200 text-xs font-bold shadow-xs flex items-center gap-1.5 backdrop-blur-xs">
+                        <span className="w-2 h-2 rounded-full bg-stone-400" />
+                        Sold Out
+                      </span>
+                    )}
                   </div>
 
                   <div className="absolute top-3 right-3">

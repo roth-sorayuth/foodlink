@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense, lazy } from 'react';
 import {
   Store,
   Compass,
@@ -10,14 +10,27 @@ import {
   Sparkles
 } from 'lucide-react';
 
+// Eagerly load Discover feed for instant first paint
 import CustomerExploreFeed from './components/customer/CustomerExploreFeed';
-import CustomerMapView from './components/customer/CustomerMapView';
-import CustomerListingDetail from './components/customer/CustomerListingDetail';
-import CustomerCheckoutFlow from './components/customer/CustomerCheckoutFlow';
-import CustomerActivePickup from './components/customer/CustomerActivePickup';
-import CustomerProfile from './components/customer/CustomerProfile';
 import ListingAlertPopup from './components/customer/ListingAlertPopup';
-import CustomerNotificationsModal from './components/customer/CustomerNotificationsModal';
+
+// Lazy load secondary views for high performance & minimal initial bundle
+const CustomerMapView = lazy(() => import('./components/customer/CustomerMapView'));
+const CustomerListingDetail = lazy(() => import('./components/customer/CustomerListingDetail'));
+const CustomerCheckoutFlow = lazy(() => import('./components/customer/CustomerCheckoutFlow'));
+const CustomerActivePickup = lazy(() => import('./components/customer/CustomerActivePickup'));
+const CustomerProfile = lazy(() => import('./components/customer/CustomerProfile'));
+const CustomerNotificationsModal = lazy(() => import('./components/customer/CustomerNotificationsModal'));
+
+function CustomerPageLoader() {
+  return (
+    <div className="flex flex-col items-center justify-center min-h-[45vh] py-16 space-y-3">
+      <div className="w-8 h-8 border-3 border-[#2E7D32] border-t-transparent rounded-full animate-spin" />
+      <span className="text-xs font-semibold text-stone-500">Loading view...</span>
+    </div>
+  );
+}
+
 import {
   socket,
   reserveListing,
@@ -27,14 +40,30 @@ import {
   playNotificationSound,
 } from './services/api';
 
+import {
+  getOrCreateCustomerUser,
+  getCustomerCart,
+  saveCustomerCart,
+  getCustomerActiveOrder,
+  saveCustomerActiveOrder,
+} from './utils/userSession';
+
 export default function App() {
   // Screen State: 'discover' | 'explore' | 'listing-detail' | 'checkout' | 'reserved' | 'profile'
   const [currentScreen, setCurrentScreen] = useState('discover');
   const [activeBottomTab, setActiveBottomTab] = useState('discover');
   const [selectedListing, setSelectedListing] = useState(null);
   const [reserveQuantity, setReserveQuantity] = useState(1);
-  const [activeOrder, setActiveOrder] = useState(null);
   const [toastMessage, setToastMessage] = useState(null);
+
+  // Isolated Customer User Identity
+  const [currentUser] = useState(() => getOrCreateCustomerUser());
+
+  // Isolated Multi-Item Cart State
+  const [cart, setCart] = useState(() => getCustomerCart(getOrCreateCustomerUser()?.id));
+
+  // Isolated Active Pickup Order State
+  const [activeOrder, setActiveOrder] = useState(() => getCustomerActiveOrder(getOrCreateCustomerUser()?.id));
 
   // Real-time Popup Alert & Notifications State
   const [activeAlert, setActiveAlert] = useState(null);
@@ -114,58 +143,146 @@ export default function App() {
     await markAllNotificationsAsRead();
   };
 
+  // Cart operations
+  const handleAddToCart = (listing, qty = 1) => {
+    if (!listing) return;
+    setCart((prev) => {
+      const existingIdx = prev.findIndex((it) => (it.listing?.id || it.id) === listing.id);
+      let updated;
+      const maxBags = listing.remaining !== undefined ? listing.remaining : (listing.bagsAvailable || 5);
+      if (existingIdx >= 0) {
+        updated = [...prev];
+        const newTotal = Math.min(maxBags, (updated[existingIdx].quantity || 1) + qty);
+        updated[existingIdx] = {
+          ...updated[existingIdx],
+          quantity: newTotal,
+        };
+      } else {
+        updated = [...prev, { listing, quantity: Math.min(maxBags, qty) }];
+      }
+      saveCustomerCart(currentUser?.id, updated);
+      return updated;
+    });
+    showToast(`✓ Added "${listing.title}" to bag`);
+  };
+
+  const handleUpdateCartQuantity = (listingId, newQty) => {
+    setCart((prev) => {
+      let updated;
+      if (newQty <= 0) {
+        updated = prev.filter((it) => (it.listing?.id || it.id) !== listingId);
+      } else {
+        updated = prev.map((it) => {
+          if ((it.listing?.id || it.id) === listingId) {
+            return { ...it, quantity: newQty };
+          }
+          return it;
+        });
+      }
+      saveCustomerCart(currentUser?.id, updated);
+      return updated;
+    });
+  };
+
+  const handleRemoveFromCart = (listingId) => {
+    setCart((prev) => {
+      const updated = prev.filter((it) => (it.listing?.id || it.id) !== listingId);
+      saveCustomerCart(currentUser?.id, updated);
+      return updated;
+    });
+    showToast('Item removed from bag');
+  };
+
+  const handleClearCart = () => {
+    setCart([]);
+    saveCustomerCart(currentUser?.id, []);
+  };
+
   const handleSelectListing = (item) => {
     setSelectedListing(item);
     setReserveQuantity(1);
     setCurrentScreen('listing-detail');
   };
 
-  const handleProceedToCheckout = (qty = 1) => {
-    setReserveQuantity(qty);
+  const handleProceedToCheckout = (qty = 1, item = null) => {
+    const targetItem = item || selectedListing;
+    if (targetItem) {
+      setCart((prev) => {
+        const exists = prev.some((it) => (it.listing?.id || it.id) === targetItem.id);
+        if (!exists) {
+          const updated = [...prev, { listing: targetItem, quantity: qty }];
+          saveCustomerCart(currentUser?.id, updated);
+          return updated;
+        }
+        return prev;
+      });
+    }
     setCurrentScreen('checkout');
   };
 
   const handleConfirmPayment = async (details = {}) => {
-    const finalQty = details.quantity || reserveQuantity || 1;
-    const orderData = {
-      orderId: 'FS-84920',
-      digits: ['7', '8', '9', '4', '2', '0'],
-      quantity: finalQty,
-      listing: selectedListing,
-      totalPaid: details.totalDue || ((4.99 * finalQty) + 0.91).toFixed(2),
-      storeName: selectedListing?.store || selectedListing?.storeName || 'Golden Gate Bakery & Cafe'
-    };
+    const itemsToReserve = (details.items && details.items.length > 0)
+      ? details.items
+      : (cart.length > 0 ? cart : (selectedListing ? [{ listing: selectedListing, quantity: reserveQuantity }] : []));
 
     try {
-      if (selectedListing?.id) {
-        await reserveListing(selectedListing.id, finalQty);
-      }
-    } catch (err) {
-      console.warn('Realtime reservation socket trigger:', err.message);
-    }
+      const response = await reserveListing({
+        items: itemsToReserve,
+        user: currentUser,
+      });
 
-    setActiveOrder(orderData);
-    showToast('Payment confirmed! Pickup pass generated.');
-    setCurrentScreen('reserved');
-    setActiveBottomTab('reserved');
+      if (response && response.order) {
+        setActiveOrder(response.order);
+        saveCustomerActiveOrder(currentUser?.id, response.order);
+      } else {
+        const fallbackCode = String(Math.floor(100000 + Math.random() * 900000));
+        const fallbackOrder = {
+          orderNumber: `#FS-${fallbackCode}`,
+          pickupCode: fallbackCode,
+          digits: fallbackCode.split(''),
+          items: itemsToReserve.map((it) => ({
+            title: it.listing?.title || it.title,
+            quantity: it.quantity || 1,
+            price: typeof it.listing?.price === 'number' ? it.listing.price : 4.99,
+            photoUrl: it.listing?.image || it.listing?.photoUrl,
+          })),
+          totalPrice: details.totalDue || '4.99',
+          customerName: currentUser?.name,
+          avatarUrl: currentUser?.avatar,
+          status: 'PENDING',
+        };
+        setActiveOrder(fallbackOrder);
+        saveCustomerActiveOrder(currentUser?.id, fallbackOrder);
+      }
+
+      // Clear cart on successful order placement
+      handleClearCart();
+      showToast('Payment confirmed! Digital pickup pass issued.');
+      setCurrentScreen('reserved');
+      setActiveBottomTab('reserved');
+    } catch (err) {
+      console.error('Reservation error:', err);
+      showToast(err.message || 'Error processing reservation. Please try again.');
+    }
   };
 
   return (
     <div className="min-h-screen bg-[#F5F5F7] text-[#1C1C1E] flex flex-col font-sans antialiased selection:bg-[#2E7D32] selection:text-white relative">
-      
       {/* Real-time Customer Notifications Modal */}
-      <CustomerNotificationsModal
-        isOpen={isNotificationsOpen}
-        onClose={() => setIsNotificationsOpen(false)}
-        notifications={notifications}
-        unreadCount={unreadCount}
-        onMarkAsRead={handleMarkAsRead}
-        onMarkAllAsRead={handleMarkAllAsRead}
-        onSelectListing={(item) => {
-          handleSelectListing(item);
-          setIsNotificationsOpen(false);
-        }}
-      />
+      <Suspense fallback={null}>
+        <CustomerNotificationsModal
+          isOpen={isNotificationsOpen}
+          onClose={() => setIsNotificationsOpen(false)}
+          notifications={notifications}
+          unreadCount={unreadCount}
+          onMarkAsRead={handleMarkAsRead}
+          onMarkAllAsRead={handleMarkAllAsRead}
+          onSelectListing={(item) => {
+            handleSelectListing(item);
+            setIsNotificationsOpen(false);
+          }}
+        />
+      </Suspense>
 
       {/* Real-time Popup Alert when Merchant Uploads Food */}
       {activeAlert && (
@@ -194,94 +311,104 @@ export default function App() {
 
       {/* Main Responsive Canvas */}
       <main className="flex-1 max-w-md sm:max-w-xl md:max-w-3xl lg:max-w-5xl mx-auto w-full px-3.5 sm:px-6 py-3">
-        
-        {/* Screen 1: Discover (Screenshot 1) */}
-        {currentScreen === 'discover' && (
-          <CustomerExploreFeed
-            onSelectListing={handleSelectListing}
-            onOpenMap={() => {
-              setCurrentScreen('explore');
-              setActiveBottomTab('explore');
-            }}
-            onNavigateToProfile={() => {
-              setCurrentScreen('profile');
-              setActiveBottomTab('profile');
-            }}
-            onNavigateToOrders={() => {
-              setCurrentScreen('reserved');
-              setActiveBottomTab('reserved');
-            }}
-            onOpenNotifications={() => setIsNotificationsOpen(true)}
-            unreadCount={unreadCount}
-          />
-        )}
+        <Suspense fallback={<CustomerPageLoader />}>
+          {/* Screen 1: Discover */}
+          {currentScreen === 'discover' && (
+            <CustomerExploreFeed
+              onSelectListing={handleSelectListing}
+              onOpenMap={() => {
+                setCurrentScreen('explore');
+                setActiveBottomTab('explore');
+              }}
+              onNavigateToProfile={() => {
+                setCurrentScreen('profile');
+                setActiveBottomTab('profile');
+              }}
+              onNavigateToOrders={() => {
+                setCurrentScreen('reserved');
+                setActiveBottomTab('reserved');
+              }}
+              onOpenNotifications={() => setIsNotificationsOpen(true)}
+              unreadCount={unreadCount}
+              onAddToCart={handleAddToCart}
+              cart={cart}
+              onOpenCheckout={() => setCurrentScreen('checkout')}
+            />
+          )}
 
-        {/* Screen 2: Explore / Map (Screenshot 2) */}
-        {currentScreen === 'explore' && (
-          <CustomerMapView
-            onSelectListing={handleSelectListing}
-            onBackToDiscover={() => {
-              setCurrentScreen('discover');
-              setActiveBottomTab('discover');
-            }}
-          />
-        )}
+          {/* Screen 2: Explore / Map */}
+          {currentScreen === 'explore' && (
+            <CustomerMapView
+              onSelectListing={handleSelectListing}
+              onBackToDiscover={() => {
+                setCurrentScreen('discover');
+                setActiveBottomTab('discover');
+              }}
+            />
+          )}
 
-        {/* Screen 3: Listing Details */}
-        {currentScreen === 'listing-detail' && (
-          <CustomerListingDetail
-            listing={selectedListing}
-            initialQuantity={reserveQuantity}
-            onBack={() => setCurrentScreen(activeBottomTab === 'explore' ? 'explore' : 'discover')}
-            onProceedToCheckout={handleProceedToCheckout}
-            onNavigateToProfile={() => {
-              setCurrentScreen('profile');
-              setActiveBottomTab('profile');
-            }}
-          />
-        )}
+          {/* Screen 3: Listing Details */}
+          {currentScreen === 'listing-detail' && (
+            <CustomerListingDetail
+              listing={selectedListing}
+              initialQuantity={reserveQuantity}
+              onBack={() => setCurrentScreen(activeBottomTab === 'explore' ? 'explore' : 'discover')}
+              onProceedToCheckout={handleProceedToCheckout}
+              onAddToCart={handleAddToCart}
+              cartItemCount={cart.reduce((s, it) => s + (it.quantity || 1), 0)}
+              onNavigateToProfile={() => {
+                setCurrentScreen('profile');
+                setActiveBottomTab('profile');
+              }}
+            />
+          )}
 
-        {/* Screen 4: Checkout Flow */}
-        {currentScreen === 'checkout' && (
-          <CustomerCheckoutFlow
-            listing={selectedListing}
-            quantity={reserveQuantity}
-            onBack={() => setCurrentScreen('listing-detail')}
-            onConfirmPayment={handleConfirmPayment}
-            onNavigateToProfile={() => {
-              setCurrentScreen('profile');
-              setActiveBottomTab('profile');
-            }}
-          />
-        )}
+          {/* Screen 4: Checkout Flow (Clean & Multi-Item) */}
+          {currentScreen === 'checkout' && (
+            <CustomerCheckoutFlow
+              cartItems={cart.length > 0 ? cart : (selectedListing ? [{ listing: selectedListing, quantity: reserveQuantity }] : [])}
+              onBack={() => setCurrentScreen('discover')}
+              onConfirmPayment={handleConfirmPayment}
+              onUpdateQuantity={handleUpdateCartQuantity}
+              onRemoveItem={handleRemoveFromCart}
+              onAddMoreItems={() => setCurrentScreen('discover')}
+              onNavigateToProfile={() => {
+                setCurrentScreen('profile');
+                setActiveBottomTab('profile');
+              }}
+            />
+          )}
 
-        {/* Screen 5: Reserved (Active Pickup Screen) */}
-        {currentScreen === 'reserved' && (
-          <CustomerActivePickup
-            order={activeOrder}
-            onBackToHome={() => {
-              setCurrentScreen('discover');
-              setActiveBottomTab('discover');
-            }}
-            onNavigateToProfile={() => {
-              setCurrentScreen('profile');
-              setActiveBottomTab('profile');
-            }}
-          />
-        )}
+          {/* Screen 5: Reserved (Active Pickup Screen with Real 6-Digit Pass) */}
+          {currentScreen === 'reserved' && (
+            <CustomerActivePickup
+              order={activeOrder}
+              currentUser={currentUser}
+              onBackToHome={() => {
+                setCurrentScreen('discover');
+                setActiveBottomTab('discover');
+              }}
+              onNavigateToProfile={() => {
+                setCurrentScreen('profile');
+                setActiveBottomTab('profile');
+              }}
+            />
+          )}
 
-        {/* Screen 6: Profile View */}
-        {currentScreen === 'profile' && (
-          <CustomerProfile
-            onBackToHome={() => {
-              setCurrentScreen('discover');
-              setActiveBottomTab('discover');
-            }}
-          />
-        )}
+          {/* Screen 6: Profile View */}
+          {currentScreen === 'profile' && (
+            <CustomerProfile
+              currentUser={currentUser}
+              onBackToHome={() => {
+                setCurrentScreen('discover');
+                setActiveBottomTab('discover');
+              }}
+            />
+          )}
+        </Suspense>
       </main>
 
-      {/* Fixed Bottom Navigation Bar (5 Tabs Matching Screenshots 1 & 2) */}
+      {/* Fixed Bottom Navigation Bar */}
       <nav className="fixed bottom-0 inset-x-0 bg-white/95 backdrop-blur-md border-t border-stone-200/70 px-2 py-2 z-40">
         <div className="max-w-md sm:max-w-xl mx-auto flex items-center justify-around">
           
@@ -327,20 +454,24 @@ export default function App() {
               setCurrentScreen('reserved');
               setActiveBottomTab('reserved');
             }}
-            className={`flex flex-col items-center gap-1 py-1 px-3 rounded-xl transition-all cursor-pointer ${
+            className={`flex flex-col items-center gap-1 py-1 px-3 rounded-xl transition-all cursor-pointer relative ${
               activeBottomTab === 'reserved' || currentScreen === 'reserved'
                 ? 'text-[#2E7D32]'
                 : 'text-stone-400 hover:text-stone-700'
             }`}
           >
-            <ShoppingBag className="w-5 h-5 stroke-[2.2]" />
+            <div className="relative">
+              <ShoppingBag className="w-5 h-5 stroke-[2.2]" />
+              {cart.length > 0 && currentScreen !== 'reserved' && (
+                <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-emerald-600 ring-2 ring-white" />
+              )}
+            </div>
             <span className={`text-[11px] ${activeBottomTab === 'reserved' || currentScreen === 'reserved' ? 'font-black' : 'font-medium'}`}>
               Reserved
             </span>
           </button>
 
-
-          {/* 5. Profile Tab */}
+          {/* 4. Profile Tab */}
           <button
             onClick={() => {
               setCurrentScreen('profile');

@@ -27,8 +27,9 @@ import {
   Globe,
   X
 } from 'lucide-react';
+import OptimizedImage from '../common/OptimizedImage';
 
-export default function CustomerProfile({ onBackToHome }) {
+export default function CustomerProfile({ onBackToHome, currentUser }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState('all');
   const [showOlderRescues, setShowOlderRescues] = useState(false);
@@ -36,6 +37,10 @@ export default function CustomerProfile({ onBackToHome }) {
   const [remindersEnabled, setRemindersEnabled] = useState(true);
   const [selectedTags, setSelectedTags] = useState(['Vegetarian', 'Vegan', 'Nut Allergy Alert']);
   const [toastMessage, setToastMessage] = useState(null);
+
+  const userName = currentUser?.name || 'Sarah Jenkins';
+  const userAvatar = currentUser?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=160&q=70';
+  const userEmail = currentUser?.email || 'demo.customer@foodlink.org';
 
   const showToast = (msg) => {
     setToastMessage(msg);
@@ -127,19 +132,26 @@ export default function CustomerProfile({ onBackToHome }) {
         <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-6">
             <div className="relative shrink-0">
-              <img 
-                src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=260&q=80" 
-                alt="Sarah Jenkins"
-                className="w-20 h-20 sm:w-24 sm:h-24 rounded-full object-cover ring-4 ring-[#2E7D32]/15 shadow-sm"
-              />
-              <div className="absolute bottom-0 right-0 w-7 h-7 bg-[#2E7D32] rounded-full flex items-center justify-center text-white ring-2 ring-white shadow-xs">
+              <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full overflow-hidden ring-4 ring-[#2E7D32]/15 shadow-sm">
+                <OptimizedImage
+                  src={userAvatar}
+                  alt={userName}
+                  width={160}
+                  height={160}
+                  quality={70}
+                  priority={true}
+                  className="w-full h-full object-cover"
+                  containerClassName="w-full h-full"
+                />
+              </div>
+              <div className="absolute bottom-0 right-0 w-7 h-7 bg-[#2E7D32] rounded-full flex items-center justify-center text-white ring-2 ring-white shadow-xs z-10">
                 <Check className="w-4 h-4 stroke-[3]" />
               </div>
             </div>
 
             <div className="space-y-1.5">
               <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-                <h1 className="text-xl sm:text-2xl font-bold text-[#1C1C1E] tracking-tight">Sarah Jenkins</h1>
+                <h1 className="text-xl sm:text-2xl font-bold text-[#1C1C1E] tracking-tight">{userName}</h1>
                 <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-[#2E7D32]/10 text-[#2E7D32] border border-[#2E7D32]/20">
                   <Leaf className="w-3 h-3" /> Level 3 Rescuer
                 </span>

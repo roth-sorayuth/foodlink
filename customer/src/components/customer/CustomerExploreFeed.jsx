@@ -12,8 +12,11 @@ import {
   RefreshCw,
   ExternalLink,
   X,
+  Plus,
 } from 'lucide-react';
 import { socket, getActiveListings, playNotificationSound } from '../../services/api';
+import OptimizedImage from '../common/OptimizedImage';
+import { getOptimizedImageUrl } from '../../utils/imageOptimizer';
 
 export default function CustomerExploreFeed({
   onSelectListing,
@@ -22,6 +25,9 @@ export default function CustomerExploreFeed({
   onNavigateToOrders,
   onOpenNotifications,
   unreadCount = 0,
+  onAddToCart,
+  cart = [],
+  onOpenCheckout,
 }) {
   const [activeCategory, setActiveCategory] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
@@ -46,15 +52,19 @@ export default function CustomerExploreFeed({
   const normalizeListing = (item) => {
     const origPriceNum = typeof item.originalPrice === 'number' ? item.originalPrice : parseFloat(item.originalPrice) || 3.60;
     const priceNum = typeof item.price === 'number' ? item.price : parseFloat(item.price) || 1.80;
-    const remaining = item.bagsAvailable !== undefined ? item.bagsAvailable : (item.remainingCount || 3);
+    const remaining = item.bagsAvailable !== undefined ? item.bagsAvailable : (item.remainingCount !== undefined ? item.remainingCount : 3);
+    const isAvailable = remaining > 0 && item.status !== 'SOLD_OUT' && item.status !== 'PAUSED';
+
+    const rawImage = item.photoUrl || item.image || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=480&q=70';
+    const rawLogo = item.store?.logoUrl || (item.storeName?.includes('CAD') || item.title?.includes('CAD') ? '/cad-bakery-logo.png' : null) || item.photoUrl || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=96&q=70';
 
     return {
       id: item.id,
       store: item.storeName || item.store?.name || item.store || 'Mori Bistro',
-      storeLogo: item.store?.logoUrl || (item.storeName?.includes('CAD') || item.title?.includes('CAD') ? '/cad-bakery-logo.png' : null) || item.photoUrl || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=120&q=80',
+      storeLogo: getOptimizedImageUrl(rawLogo, { width: 96, height: 96, quality: 70 }),
       title: item.title,
       description: item.description,
-      image: item.photoUrl || item.image || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=800&q=80',
+      image: getOptimizedImageUrl(rawImage, { width: 480, quality: 70 }),
       rating: item.store?.rating ? String(item.store.rating) : '4.7',
       distance: item.store?.distance || '1.7 km',
       pickupTime: item.pickupStart ? `${item.pickupStart}–${item.pickupEnd}` : '10:00 AM–9:00 PM',
@@ -62,6 +72,7 @@ export default function CustomerExploreFeed({
       price: `$${priceNum.toFixed(2)}`,
       originalPrice: `$${origPriceNum.toFixed(2)}`,
       remaining,
+      isAvailable,
       category: item.category || 'Meals',
       raw: item,
     };
@@ -74,7 +85,7 @@ export default function CustomerExploreFeed({
       store: 'CAD Bakery',
       storeLogo: '/cad-bakery-logo.png',
       title: 'Artisan Sourdough & Croissant Surprise Box',
-      image: 'https://images.unsplash.com/photo-1555507036-ab1f4038808a?auto=format&fit=crop&w=800&q=80',
+      image: 'https://images.unsplash.com/photo-1555507036-ab1f4038808a?auto=format&fit=crop&w=480&q=70',
       rating: '4.9',
       distance: '0.4 km',
       pickupTime: '6:30 PM–7:30 PM',
@@ -90,7 +101,7 @@ export default function CustomerExploreFeed({
       store: 'CAD Bakery',
       storeLogo: '/cad-bakery-logo.png',
       title: 'French Butter Croissant & Viennoiserie Bag',
-      image: 'https://images.unsplash.com/photo-1549931319-a545dcf3bc73?auto=format&fit=crop&w=800&q=80',
+      image: 'https://images.unsplash.com/photo-1549931319-a545dcf3bc73?auto=format&fit=crop&w=480&q=70',
       rating: '4.9',
       distance: '0.4 km',
       pickupTime: '6:00 PM–7:30 PM',
@@ -106,7 +117,7 @@ export default function CustomerExploreFeed({
       store: 'CAD Bakery',
       storeLogo: '/cad-bakery-logo.png',
       title: 'Rustic Country Sourdough & Baguette Pack',
-      image: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=800&q=80',
+      image: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=480&q=70',
       rating: '4.9',
       distance: '0.4 km',
       pickupTime: '6:30 PM–8:00 PM',
@@ -122,7 +133,7 @@ export default function CustomerExploreFeed({
       store: 'CAD Bakery',
       storeLogo: '/cad-bakery-logo.png',
       title: 'Sweet Tartlets, Cakes & Danish Treats',
-      image: 'https://images.unsplash.com/photo-1578985545062-69928b1d9587?auto=format&fit=crop&w=800&q=80',
+      image: 'https://images.unsplash.com/photo-1578985545062-69928b1d9587?auto=format&fit=crop&w=480&q=70',
       rating: '4.9',
       distance: '0.4 km',
       pickupTime: '7:00 PM–8:30 PM',
@@ -138,7 +149,7 @@ export default function CustomerExploreFeed({
       store: 'CAD Bakery',
       storeLogo: '/cad-bakery-logo.png',
       title: 'Savory Focaccia & Stuffed Brioche Box',
-      image: 'https://images.unsplash.com/photo-1528735602780-2552fd46c7af?auto=format&fit=crop&w=800&q=80',
+      image: 'https://images.unsplash.com/photo-1528735602780-2552fd46c7af?auto=format&fit=crop&w=480&q=70',
       rating: '4.9',
       distance: '0.4 km',
       pickupTime: '6:00 PM–7:30 PM',
@@ -154,7 +165,7 @@ export default function CustomerExploreFeed({
       store: 'CAD Bakery',
       storeLogo: '/cad-bakery-logo.png',
       title: 'Barista Cold Brew & Afternoon Pastry Pair',
-      image: 'https://images.unsplash.com/photo-1517256064527-09c73fc73e38?auto=format&fit=crop&w=800&q=80',
+      image: 'https://images.unsplash.com/photo-1517256064527-09c73fc73e38?auto=format&fit=crop&w=480&q=70',
       rating: '4.9',
       distance: '0.4 km',
       pickupTime: '5:30 PM–7:00 PM',
@@ -169,7 +180,7 @@ export default function CustomerExploreFeed({
       id: 'mori-bistro',
       store: 'Mori Bistro',
       title: 'Japanese Donburi & Bento Surprise Bag',
-      image: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=800&q=80',
+      image: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=480&q=70',
       rating: '4.7',
       distance: '1.7 km',
       pickupTime: '10:00 AM–9:00 PM',
@@ -184,7 +195,7 @@ export default function CustomerExploreFeed({
       id: 'aus-bake',
       store: 'AusBake Pastries',
       title: 'Baking Pastries in Cambodia Since 2003',
-      image: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=800&q=80',
+      image: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=480&q=70',
       rating: '4.8',
       distance: '2.1 km',
       pickupTime: '11:00 AM–8:30 PM',
@@ -199,7 +210,7 @@ export default function CustomerExploreFeed({
       id: 'green-earth',
       store: 'Green Earth Grocers',
       title: 'Fresh Organic Produce & Dairy Box',
-      image: 'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=800&q=80',
+      image: 'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=480&q=70',
       rating: '4.8',
       distance: '0.8 km',
       pickupTime: '7:00 PM–8:30 PM',
@@ -209,6 +220,23 @@ export default function CustomerExploreFeed({
       remaining: 2,
       category: 'Healthy',
       description: 'Assorted seasonal organic vegetables, fruit basket, and dairy surplus items.',
+    },
+    {
+      id: 'java-creative-cafe',
+      store: 'Java Creative Cafe',
+      title: 'Artisan Bakery & Filter Coffee Bundle',
+      image: 'https://images.unsplash.com/photo-1554118811-1e0d58224f24?auto=format&fit=crop&w=480&q=70',
+      rating: '5.0',
+      distance: '8.0 km',
+      pickupTime: 'Today',
+      address: '20A St 337, Toul Kork',
+      price: '$4.00',
+      originalPrice: '$10.00',
+      remaining: 0,
+      isAvailable: false,
+      status: 'SOLD_OUT',
+      category: 'Food',
+      description: 'Daily fresh unsold quiches, pastries and premium roast cold brew coffee.',
     },
   ];
 
@@ -267,10 +295,20 @@ export default function CustomerExploreFeed({
       }, 15000);
     };
 
+    const handleListingUpdated = (data) => {
+      const item = data?.listing || data;
+      const normalized = normalizeListing(item);
+      setListings((prev) =>
+        prev.map((l) => (l.id === normalized.id ? { ...l, ...normalized } : l))
+      );
+    };
+
     socket.on('NEW_LISTING', handleNewListing);
+    socket.on('LISTING_UPDATED', handleListingUpdated);
 
     return () => {
       socket.off('NEW_LISTING', handleNewListing);
+      socket.off('LISTING_UPDATED', handleListingUpdated);
     };
   }, []);
 
@@ -312,8 +350,17 @@ export default function CustomerExploreFeed({
     );
   });
 
+  const cartCount = cart.reduce((sum, it) => sum + (it.quantity || 1), 0);
+  const cartTotal = cart.reduce((sum, it) => {
+    const rawPrice = it.listing?.price;
+    const p = typeof rawPrice === 'number'
+      ? rawPrice
+      : parseFloat(String(rawPrice || '4.99').replace(/[^0-9.]/g, '')) || 4.99;
+    return sum + (p * (it.quantity || 1));
+  }, 0);
+
   return (
-    <div className="space-y-4 pb-24 font-sans text-stone-900">
+    <div className="space-y-4 pb-28 font-sans text-stone-900 relative">
       
       {/* 1. TOP SEARCH BAR + NOTIFICATION BELL */}
       <div className="flex items-center gap-3 pt-1">
@@ -456,45 +503,65 @@ export default function CustomerExploreFeed({
 
         {/* Horizontal Card Carousel */}
         <div className="flex gap-4 overflow-x-auto pb-4 pt-1 scrollbar-none -mx-3.5 px-3.5 sm:mx-0 sm:px-0">
-          {filteredListings.slice(0, 4).map((item, idx) => {
+          {filteredListings.slice(0, 5).map((item, idx) => {
             const isJustAdded = justAddedIds.has(item.id);
+            const isUnavailable = !item.isAvailable || item.remaining <= 0 || item.status === 'SOLD_OUT';
             return (
               <div
                 key={item.id}
                 onClick={() => onSelectListing(item)}
                 style={{ animationDelay: `${idx * 80}ms` }}
-                className={`w-[290px] sm:w-[320px] shrink-0 bg-white rounded-3xl overflow-hidden border food-card shadow-xs cursor-pointer flex flex-col group relative ${
-                  isJustAdded ? 'border-[#2E7D32] ring-2 ring-[#2E7D32]/30' : 'border-stone-200/80 hover:border-emerald-500/50'
+                className={`w-[290px] sm:w-[320px] shrink-0 bg-white rounded-3xl overflow-hidden border food-card shadow-xs cursor-pointer flex flex-col group relative transition-all duration-300 ${
+                  isUnavailable
+                    ? 'border-stone-300/80 bg-stone-50/60 opacity-90'
+                    : isJustAdded
+                    ? 'border-[#2E7D32] ring-2 ring-[#2E7D32]/30'
+                    : 'border-stone-200/80 hover:border-emerald-500/50'
                 }`}
               >
                 {/* Hero Image Container */}
-                <div className="relative h-44 w-full bg-stone-100 overflow-hidden">
-                  <img
+                <div className={`relative h-44 w-full bg-stone-100 overflow-hidden transition-all duration-300 ${isUnavailable ? 'grayscale contrast-75' : ''}`}>
+                  <OptimizedImage
                     src={item.image}
                     alt={item.store}
+                    width={400}
+                    quality={70}
+                    priority={idx === 0}
                     className="w-full h-full object-cover group-hover:scale-108 transition-transform duration-700 ease-out"
+                    containerClassName="w-full h-full"
                   />
 
                   {/* Just Added Glowing Badge */}
-                  {isJustAdded && (
+                  {isJustAdded && !isUnavailable && (
                     <div className="absolute top-2.5 left-2.5 z-10 flex items-center gap-1 px-2.5 py-1 rounded-xl bg-emerald-600 text-white text-[10px] font-black uppercase tracking-wider shadow-lg ring-2 ring-white animate-pulse">
                       <Sparkles className="w-3 h-3 fill-amber-300 text-amber-300" />
                       <span>JUST LISTED</span>
                     </div>
                   )}
 
+                  {/* Sold Out Badge */}
+                  {isUnavailable && (
+                    <div className="absolute top-2.5 left-2.5 z-10 flex items-center gap-1 px-2.5 py-1 rounded-xl bg-stone-900/90 text-stone-200 text-[10px] font-black uppercase tracking-wider shadow-md backdrop-blur-xs">
+                      <span>SOLD OUT</span>
+                    </div>
+                  )}
+
                   {/* Dark Discount Price Badge (strikethrough + bold price) */}
                   <div className="absolute bottom-2.5 right-2.5 bg-black/80 backdrop-blur-md px-3 py-1 rounded-xl text-white flex items-center gap-1.5 shadow-md group-hover:scale-105 transition-transform duration-300">
                     <span className="text-[11px] text-stone-300 line-through font-normal">{item.originalPrice}</span>
-                    <span className="text-base font-black text-white">{item.price}</span>
+                    <span className="text-base font-black text-white">{isUnavailable ? 'Sold Out' : item.price}</span>
                   </div>
 
                   {/* Overhanging Store Logo Avatar on bottom left */}
-                  <div className="absolute -bottom-3 left-4 w-12 h-12 rounded-full overflow-hidden bg-white border-2 border-white shadow-md flex items-center justify-center group-hover:scale-110 group-hover:rotate-3 transition-transform duration-300">
-                    <img
+                  <div className={`absolute -bottom-3 left-4 w-12 h-12 rounded-full overflow-hidden bg-white border-2 border-white shadow-md flex items-center justify-center transition-all duration-300 ${isUnavailable ? 'grayscale contrast-75' : 'group-hover:scale-110 group-hover:rotate-3'}`}>
+                    <OptimizedImage
                       src={item.storeLogo || item.image}
                       alt={item.store}
+                      width={96}
+                      height={96}
+                      quality={70}
                       className="w-full h-full object-cover"
+                      containerClassName="w-full h-full"
                     />
                   </div>
                 </div>
@@ -527,16 +594,32 @@ export default function CustomerExploreFeed({
                       <span className="truncate">{item.address}</span>
                     </div>
 
-                    <button
-                      onClick={(e) => toggleFavorite(item.id, e)}
-                      className="p-1.5 text-stone-400 hover:text-rose-500 active:scale-125 transition-all duration-200 cursor-pointer"
-                    >
-                      <Heart
-                        className={`w-4 h-4 transition-all duration-200 ${
-                          favorites.includes(item.id) ? 'fill-rose-500 text-rose-500 scale-110 heart-pop' : 'hover:scale-115'
-                        }`}
-                      />
-                    </button>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={(e) => toggleFavorite(item.id, e)}
+                        className="p-1.5 text-stone-400 hover:text-rose-500 active:scale-125 transition-all duration-200 cursor-pointer"
+                        title="Favorite"
+                      >
+                        <Heart
+                          className={`w-4 h-4 transition-all duration-200 ${
+                            favorites.includes(item.id) ? 'fill-rose-500 text-rose-500 scale-110 heart-pop' : 'hover:scale-115'
+                          }`}
+                        />
+                      </button>
+
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (onAddToCart) onAddToCart(item, 1);
+                        }}
+                        disabled={isUnavailable}
+                        className="px-2.5 py-1 rounded-xl bg-emerald-50 hover:bg-[#2E7D32] hover:text-white text-[#2E7D32] text-xs font-extrabold transition-all flex items-center gap-1 shadow-2xs active:scale-95 cursor-pointer disabled:opacity-40"
+                        title="Add to bag"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>Add</span>
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -587,43 +670,63 @@ export default function CustomerExploreFeed({
           <div className="space-y-4">
             {filteredListings.map((item, idx) => {
               const isJustAdded = justAddedIds.has(item.id);
+              const isUnavailable = !item.isAvailable || item.remaining <= 0 || item.status === 'SOLD_OUT';
               return (
               <div
                 key={item.id}
                 onClick={() => onSelectListing(item)}
                 style={{ animationDelay: `${Math.min(idx, 6) * 60}ms` }}
                 className={`bg-white rounded-3xl overflow-hidden border food-card shadow-xs cursor-pointer flex flex-col group relative transition-all duration-300 ${
-                  isJustAdded ? 'border-[#2E7D32] ring-2 ring-[#2E7D32]/40 shadow-md' : 'border-stone-200/80 hover:border-emerald-500/50'
+                  isUnavailable
+                    ? 'border-stone-300/80 bg-stone-50/60 opacity-90'
+                    : isJustAdded
+                    ? 'border-[#2E7D32] ring-2 ring-[#2E7D32]/40 shadow-md'
+                    : 'border-stone-200/80 hover:border-emerald-500/50'
                 }`}
               >
                 {/* Hero Image Banner */}
-                <div className="relative h-48 sm:h-56 w-full bg-stone-100 overflow-hidden">
-                  <img
+                <div className={`relative h-48 sm:h-56 w-full bg-stone-100 overflow-hidden transition-all duration-300 ${isUnavailable ? 'grayscale contrast-75' : ''}`}>
+                  <OptimizedImage
                     src={item.image}
                     alt={item.store}
+                    width={520}
+                    quality={70}
+                    priority={idx === 0}
                     className="w-full h-full object-cover group-hover:scale-106 transition-transform duration-700 ease-out"
+                    containerClassName="w-full h-full"
                   />
 
                   {/* Just Added Glowing Badge */}
-                  {isJustAdded && (
+                  {isJustAdded && !isUnavailable && (
                     <div className="absolute top-3 left-3 z-10 flex items-center gap-1.5 px-3 py-1 rounded-xl bg-emerald-600 text-white text-xs font-black uppercase tracking-wider shadow-lg ring-2 ring-white animate-pulse">
                       <Sparkles className="w-3.5 h-3.5 fill-amber-300 text-amber-300" />
                       <span>JUST LISTED</span>
                     </div>
                   )}
 
+                  {/* Sold Out Badge */}
+                  {isUnavailable && (
+                    <div className="absolute top-3 left-3 z-10 flex items-center gap-1 px-3 py-1 rounded-xl bg-stone-900/90 text-stone-200 text-xs font-black uppercase tracking-wider shadow-md backdrop-blur-xs">
+                      <span>SOLD OUT</span>
+                    </div>
+                  )}
+
                   {/* Dark Discount Price Badge */}
                   <div className="absolute bottom-3 right-3 bg-black/80 backdrop-blur-md px-3.5 py-1.5 rounded-xl text-white flex items-center gap-1.5 shadow-md group-hover:scale-105 transition-transform duration-300">
                     <span className="text-xs text-stone-300 line-through font-normal">{item.originalPrice}</span>
-                    <span className="text-lg font-black text-white">{item.price}</span>
+                    <span className="text-lg font-black text-white">{isUnavailable ? 'Sold Out' : item.price}</span>
                   </div>
 
                   {/* Overhanging Store Logo Avatar on bottom left */}
-                  <div className="absolute -bottom-3 left-4 w-12 h-12 rounded-full overflow-hidden bg-white border-2 border-white shadow-md flex items-center justify-center group-hover:scale-110 group-hover:rotate-3 transition-transform duration-300">
-                    <img
+                  <div className={`absolute -bottom-3 left-4 w-12 h-12 rounded-full overflow-hidden bg-white border-2 border-white shadow-md flex items-center justify-center transition-all duration-300 ${isUnavailable ? 'grayscale contrast-75' : 'group-hover:scale-110 group-hover:rotate-3'}`}>
+                    <OptimizedImage
                       src={item.storeLogo || item.image}
                       alt={item.store}
+                      width={96}
+                      height={96}
+                      quality={70}
                       className="w-full h-full object-cover"
+                      containerClassName="w-full h-full"
                     />
                   </div>
                 </div>
@@ -632,7 +735,7 @@ export default function CustomerExploreFeed({
                 <div className="p-4 sm:p-5 pt-5 space-y-2.5">
                   <div className="flex items-start justify-between gap-2">
                     <div>
-                      <h3 className="font-extrabold text-base sm:text-lg text-stone-900 group-hover:text-[#2E7D32] transition-colors duration-200">
+                      <h3 className={`font-extrabold text-base sm:text-lg transition-colors duration-200 ${isUnavailable ? 'text-stone-700' : 'text-stone-900 group-hover:text-[#2E7D32]'}`}>
                         {item.store}
                       </h3>
                       <p className="text-xs text-stone-500 font-medium mt-0.5">{item.title}</p>
@@ -656,7 +759,7 @@ export default function CustomerExploreFeed({
                   {/* Address & Actions */}
                   <div className="flex items-center justify-between pt-2 border-t border-stone-100">
                     <div className="flex items-center gap-1 text-xs text-stone-500 truncate max-w-[240px]">
-                      <MapPin className="w-3.5 h-3.5 text-[#2E7D32] shrink-0" />
+                      <MapPin className={`w-3.5 h-3.5 shrink-0 ${isUnavailable ? 'text-stone-400' : 'text-[#2E7D32]'}`} />
                       <span className="truncate">{item.address}</span>
                     </div>
 
@@ -664,6 +767,7 @@ export default function CustomerExploreFeed({
                       <button
                         onClick={(e) => toggleFavorite(item.id, e)}
                         className="p-1.5 text-stone-400 hover:text-rose-500 active:scale-125 transition-all duration-200 cursor-pointer"
+                        title="Favorite"
                       >
                         <Heart
                           className={`w-4 h-4 transition-all duration-200 ${
@@ -675,11 +779,29 @@ export default function CustomerExploreFeed({
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
+                          if (onAddToCart) onAddToCart(item, 1);
+                        }}
+                        disabled={isUnavailable}
+                        className="px-3 py-1.5 rounded-full bg-emerald-50 hover:bg-[#2E7D32] hover:text-white text-[#2E7D32] text-xs font-extrabold transition-all flex items-center gap-1 shadow-2xs active:scale-95 cursor-pointer disabled:opacity-40"
+                        title="Add to bag"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>Add</span>
+                      </button>
+
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
                           onSelectListing(item);
                         }}
-                        className="px-4 py-1.5 rounded-full bg-[#2E7D32] hover:bg-[#256629] text-white text-xs font-bold shadow-xs hover:shadow-md hover:shadow-emerald-900/20 active:scale-95 hover:scale-105 transition-all duration-200 cursor-pointer"
+                        disabled={isUnavailable}
+                        className={`px-4 py-1.5 rounded-full text-xs font-bold shadow-xs transition-all duration-200 ${
+                          isUnavailable
+                            ? 'bg-stone-200 text-stone-500 cursor-not-allowed'
+                            : 'bg-[#2E7D32] hover:bg-[#256629] text-white hover:shadow-md hover:shadow-emerald-900/20 active:scale-95 hover:scale-105 cursor-pointer'
+                        }`}
                       >
-                        Reserve
+                        {isUnavailable ? 'Sold Out' : 'Reserve'}
                       </button>
                     </div>
                   </div>
@@ -690,6 +812,32 @@ export default function CustomerExploreFeed({
         </div>
         )}
       </div>
+
+      {/* Floating Multi-Item Cart Pill */}
+      {cartCount > 0 && (
+        <div className="fixed bottom-20 inset-x-4 max-w-md mx-auto z-40 animate-in fade-in slide-in-from-bottom-4">
+          <button
+            onClick={() => onOpenCheckout && onOpenCheckout()}
+            className="w-full bg-[#1b5e20] hover:bg-[#144919] text-white px-5 py-3.5 rounded-2xl shadow-xl flex items-center justify-between cursor-pointer border border-emerald-500/40 active:scale-[0.99] transition-all"
+          >
+            <div className="flex items-center gap-3">
+              <span className="w-7 h-7 rounded-full bg-white/20 flex items-center justify-center text-xs font-black">
+                {cartCount}
+              </span>
+              <div className="text-left">
+                <span className="font-extrabold text-sm block leading-tight">View Bag & Reserve</span>
+                <span className="text-[11px] text-emerald-200">{cart.length} item type{cart.length > 1 ? 's' : ''} in bag</span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-1.5 font-black text-base">
+              <span>${cartTotal.toFixed(2)}</span>
+              <ChevronRight className="w-4 h-4" />
+            </div>
+          </button>
+        </div>
+      )}
+
     </div>
   );
 }

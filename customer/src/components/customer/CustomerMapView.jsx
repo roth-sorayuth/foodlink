@@ -12,6 +12,7 @@ import {
   ShoppingBag,
   X
 } from 'lucide-react';
+import OptimizedImage from '../common/OptimizedImage';
 
 export default function CustomerMapView({ listings = [], onSelectListing, onBackToDiscover }) {
   const [searchQuery, setSearchQuery] = useState('');
@@ -223,11 +224,17 @@ export default function CustomerMapView({ listings = [], onSelectListing, onBack
         <div className="absolute bottom-4 inset-x-4 z-40 max-w-sm sm:max-w-md mx-auto bg-white text-stone-900 rounded-3xl p-4 shadow-2xl border border-stone-200 animate-in fade-in slide-in-from-bottom-5">
           <div className="flex items-start justify-between gap-3">
             <div className="flex items-center gap-3">
-              <img
-                src={selectedPin.image}
-                alt={selectedPin.name}
-                className="w-14 h-14 rounded-2xl object-cover shrink-0 border border-stone-100"
-              />
+              <div className="w-14 h-14 rounded-2xl overflow-hidden shrink-0 border border-stone-100 shadow-2xs">
+                <OptimizedImage
+                  src={selectedPin.image}
+                  alt={selectedPin.name}
+                  width={112}
+                  height={112}
+                  quality={70}
+                  className="w-full h-full object-cover"
+                  containerClassName="w-full h-full"
+                />
+              </div>
               <div>
                 <h4 className="font-extrabold text-sm text-[#1C1C1E]">{selectedPin.name}</h4>
                 <p className="text-xs text-stone-500">{selectedPin.street}</p>

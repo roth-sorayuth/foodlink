@@ -31,22 +31,49 @@ export default function MerchantOrders({ onOpenVerify, onNavigateToProfile, onCo
   const [completedOrders, setCompletedOrders] = useState([]);
 
   // Normalize order from DB
-  const normalizeOrder = (o) => ({
-    id: o.id,
-    customer: o.user?.name || 'Valued Customer',
-    orderNumber: o.orderNumber || `#FS-${o.id.slice(-5)}`,
-    code: o.pickupCode || 'SAVER-100',
-    avatarColor: 'bg-emerald-200 text-emerald-900',
-    initials: (o.user?.name || 'VC').split(' ').map((n) => n[0]).join('').slice(0, 2),
-    itemTitle: o.listing?.title || 'Surplus Surprise Bag',
-    image: o.listing?.photoUrl || 'https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=200&q=80',
-    qty: o.quantity || 1,
-    co2: `Saved ${(o.co2SavedKg || 1.2).toFixed(1)} kg CO₂e`,
-    price: `$${(o.totalPrice || 4.99).toFixed(2)}`,
-    status: o.status,
-    time: new Date(o.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-    verifiedAt: o.verifiedAt ? new Date(o.verifiedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : null,
-  });
+  const normalizeOrder = (o) => {
+    let parsedItems = [];
+    if (Array.isArray(o.items) && o.items.length > 0) {
+      parsedItems = o.items;
+    } else if (o.qrCodeData) {
+      try {
+        const parsed = JSON.parse(o.qrCodeData);
+        if (Array.isArray(parsed.items)) parsedItems = parsed.items;
+      } catch (e) {}
+    }
+
+    if (parsedItems.length === 0 && o.listing) {
+      parsedItems = [{
+        title: o.listing.title,
+        quantity: o.quantity || 1,
+        price: o.listing.price || 4.99,
+        photoUrl: o.listing.photoUrl || o.listing.image,
+      }];
+    }
+
+    const totalQty = o.quantity || parsedItems.reduce((s, it) => s + (it.quantity || 1), 0) || 1;
+    const itemsTitle = parsedItems.length > 1
+      ? `${parsedItems.map(it => `${it.quantity}x ${it.title}`).join(', ')}`
+      : (parsedItems[0]?.title || o.listing?.title || 'Surplus Surprise Bag');
+
+    return {
+      id: o.id,
+      customer: o.user?.name || o.customerName || 'Valued Customer',
+      orderNumber: o.orderNumber || `#FS-${String(o.id).slice(-5)}`,
+      code: o.pickupCode || 'SAVER-100',
+      avatarColor: 'bg-emerald-200 text-emerald-900',
+      initials: (o.user?.name || o.customerName || 'VC').split(' ').map((n) => n[0]).join('').slice(0, 2),
+      itemTitle: itemsTitle,
+      items: parsedItems,
+      image: parsedItems[0]?.photoUrl || o.listing?.photoUrl || 'https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=200&q=80',
+      qty: totalQty,
+      co2: `Saved ${(o.co2SavedKg || 1.2 * totalQty).toFixed(1)} kg CO₂e`,
+      price: `$${(o.totalPrice || 4.99).toFixed(2)}`,
+      status: o.status,
+      time: o.createdAt ? new Date(o.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Just now',
+      verifiedAt: o.verifiedAt ? new Date(o.verifiedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : null,
+    };
+  };
 
   // Fetch initial orders from database
   const loadOrders = async () => {
@@ -99,7 +126,7 @@ export default function MerchantOrders({ onOpenVerify, onNavigateToProfile, onCo
         if (onPendingOrdersChange) onPendingOrdersChange(updated.length);
         return updated;
       });
-      showToast(`🔔 New Order! ${normalized.customer} reserved 1x "${normalized.itemTitle}" (${normalized.code})`);
+      showToast(`🔔 New Order! ${normalized.customer} reserved ${normalized.qty} bag(s) (Code: ${normalized.code})`);
     };
 
     socket.on('ORDER_CREATED', handleOrderCreated);
@@ -109,13 +136,8 @@ export default function MerchantOrders({ onOpenVerify, onNavigateToProfile, onCo
     };
   }, [onPendingOrdersChange]);
 
-  const confirmPickup = async (order) => {
-    try {
-      await verifyOrderPickup(order.code);
-    } catch (err) {
-      console.warn('Verification note:', err.message);
-    }
-
+  const confirmPickup = (order) => {
+    // 1. INSTANT Optimistic UI Update: zero wait time, immediate feedback
     const remaining = pendingOrders.filter((o) => o.id !== order.id);
     setPendingOrders(remaining);
     setCompletedOrders((prev) => [
@@ -132,6 +154,13 @@ export default function MerchantOrders({ onOpenVerify, onNavigateToProfile, onCo
     if (onConfirmPickup) {
       onConfirmPickup(remaining.length);
     }
+
+    showToast(`✓ Order ${order.orderNumber} confirmed & handed over!`);
+
+    // 2. Fire backend verification asynchronously in the background
+    verifyOrderPickup({ code: order.code, orderId: order.id }).catch((err) => {
+      console.warn('Background pickup verification note:', err.message);
+    });
   };
 
   const copyCode = (code) => {
@@ -277,22 +306,49 @@ export default function MerchantOrders({ onOpenVerify, onNavigateToProfile, onCo
                 </div>
 
                 {/* Item Details */}
-                <div className="p-3 rounded-2xl bg-stone-50 border border-stone-200/70 flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <img
-                      src={order.image}
-                      alt={order.itemTitle}
-                      className="w-10 h-10 rounded-xl object-cover hover:scale-105 transition-transform"
-                    />
-                    <div>
-                      <h4 className="font-bold text-xs text-[#1C1C1E]">{order.itemTitle}</h4>
-                      <p className="text-[11px] text-stone-500">
-                        Qty: {order.qty} • <span className="text-[#2E7D32] font-semibold">{order.co2}</span>
-                      </p>
+                <div className="p-3 rounded-2xl bg-stone-50 border border-stone-200/70 space-y-2">
+                  {order.items && order.items.length > 1 ? (
+                    <div className="space-y-2 divide-y divide-stone-200/60">
+                      {order.items.map((it, i) => (
+                        <div key={i} className={`flex items-center justify-between ${i > 0 ? 'pt-2' : ''}`}>
+                          <div className="flex items-center gap-2.5">
+                            <img
+                              src={it.photoUrl || order.image}
+                              alt={it.title}
+                              className="w-8 h-8 rounded-lg object-cover"
+                            />
+                            <div>
+                              <h4 className="font-bold text-xs text-[#1C1C1E]">{it.quantity}× {it.title}</h4>
+                              <p className="text-[10px] text-stone-500">${(it.price || 4.99).toFixed(2)} / bag</p>
+                            </div>
+                          </div>
+                          <span className="font-bold text-xs text-stone-700">${((it.price || 4.99) * (it.quantity || 1)).toFixed(2)}</span>
+                        </div>
+                      ))}
+                      <div className="pt-2 flex items-center justify-between text-xs">
+                        <span className="text-[11px] text-stone-500 font-semibold">{order.qty} total bags • <span className="text-[#2E7D32]">{order.co2}</span></span>
+                        <span className="font-extrabold text-sm text-[#2E7D32]">{order.price}</span>
+                      </div>
                     </div>
-                  </div>
+                  ) : (
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <img
+                          src={order.image}
+                          alt={order.itemTitle}
+                          className="w-10 h-10 rounded-xl object-cover hover:scale-105 transition-transform"
+                        />
+                        <div>
+                          <h4 className="font-bold text-xs text-[#1C1C1E]">{order.itemTitle}</h4>
+                          <p className="text-[11px] text-stone-500">
+                            Qty: {order.qty} • <span className="text-[#2E7D32] font-semibold">{order.co2}</span>
+                          </p>
+                        </div>
+                      </div>
 
-                  <span className="font-extrabold text-sm text-[#2E7D32]">{order.price}</span>
+                      <span className="font-extrabold text-sm text-[#2E7D32]">{order.price}</span>
+                    </div>
+                  )}
                 </div>
 
                 {/* Confirm Pickup Action Button */}

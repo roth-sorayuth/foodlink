@@ -220,14 +220,18 @@ export async function getMerchantOrders() {
 }
 
 /**
- * Verify customer pickup code (e.g. SAVER-789)
+ * Verify customer pickup code (e.g. SAVER-789 or 6-digit code or { code, orderId })
  */
-export async function verifyOrderPickup(code) {
+export async function verifyOrderPickup(target) {
   try {
+    const payload = typeof target === 'object' && target !== null
+      ? target
+      : { code: target };
+
     const res = await fetch(`${API_BASE_URL}/orders/verify`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ code }),
+      body: JSON.stringify(payload),
     });
 
     const data = await res.json();
