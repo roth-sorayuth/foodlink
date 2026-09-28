@@ -50,30 +50,45 @@ export default function CustomerExploreFeed({
 
   // Helper to normalize listings into the UMAMI card shape from the screenshot
   const normalizeListing = (item) => {
-    const origPriceNum = typeof item.originalPrice === 'number' ? item.originalPrice : parseFloat(item.originalPrice) || 3.60;
-    const priceNum = typeof item.price === 'number' ? item.price : parseFloat(item.price) || 1.80;
-    const remaining = item.bagsAvailable !== undefined ? Number(item.bagsAvailable) : (item.remainingCount !== undefined ? Number(item.remainingCount) : 0);
-    const isAvailable = remaining > 0 && item.status !== 'PAUSED';
+    if (!item) return null;
+    const origPriceNum = typeof item.originalPrice === 'number'
+      ? item.originalPrice
+      : parseFloat(String(item.originalPrice || '16.00').replace(/[^0-9.]/g, '')) || 3.60;
+    const priceNum = typeof item.price === 'number'
+      ? item.price
+      : parseFloat(String(item.price || '4.99').replace(/[^0-9.]/g, '')) || 1.80;
+
+    const remaining = item.remaining !== undefined
+      ? Number(item.remaining)
+      : (item.bagsAvailable !== undefined
+          ? Number(item.bagsAvailable)
+          : (item.remainingCount !== undefined ? Number(item.remainingCount) : 0));
+
+    const isAvailable = item.isAvailable !== undefined
+      ? Boolean(item.isAvailable)
+      : (remaining > 0 && item.status !== 'PAUSED' && item.status !== 'SOLD_OUT');
 
     const rawImage = item.photoUrl || item.image || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=480&q=70';
     const rawLogo = item.store?.logoUrl || (item.storeName?.includes('CAD') || item.title?.includes('CAD') ? '/cad-bakery-logo.png' : null) || item.photoUrl || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=96&q=70';
 
     return {
       id: item.id,
-      store: item.storeName || item.store?.name || item.store || 'Mori Bistro',
+      store: item.storeName || item.store?.name || item.store || 'CAD Bakery',
       storeLogo: getOptimizedImageUrl(rawLogo, { width: 96, height: 96, quality: 70 }),
       title: item.title,
       description: item.description,
       image: getOptimizedImageUrl(rawImage, { width: 480, quality: 70 }),
-      rating: item.store?.rating ? String(item.store.rating) : '4.7',
-      distance: item.store?.distance || '1.7 km',
-      pickupTime: item.pickupStart ? `${item.pickupStart}–${item.pickupEnd}` : '10:00 AM–9:00 PM',
-      address: item.store?.address || '58 Street R8, Daun Penh',
-      price: `$${priceNum.toFixed(2)}`,
-      originalPrice: `$${origPriceNum.toFixed(2)}`,
+      rating: item.store?.rating ? String(item.store.rating) : (item.rating ? String(item.rating) : '4.9'),
+      distance: item.store?.distance || item.distance || '0.4 km',
+      pickupTime: item.pickupStart ? `${item.pickupStart}–${item.pickupEnd}` : (item.pickupTime || '6:30 PM–7:30 PM'),
+      address: item.store?.address || item.address || '422 St 178, Daun Penh',
+      price: typeof item.price === 'string' && item.price.startsWith('$') ? item.price : `$${priceNum.toFixed(2)}`,
+      originalPrice: typeof item.originalPrice === 'string' && item.originalPrice.startsWith('$') ? item.originalPrice : `$${origPriceNum.toFixed(2)}`,
       remaining,
+      bagsAvailable: remaining,
       isAvailable,
-      category: item.category || 'Meals',
+      status: item.status || (isAvailable ? 'ACTIVE' : 'SOLD_OUT'),
+      category: item.category || 'Pastry',
       raw: item,
     };
   };
@@ -93,6 +108,9 @@ export default function CustomerExploreFeed({
       price: '$4.99',
       originalPrice: '$16.00',
       remaining: 4,
+      bagsAvailable: 4,
+      isAvailable: true,
+      status: 'ACTIVE',
       category: 'Pastry',
       description: 'Artisanal European sourdough loaves, buttery croissants, and morning viennoiserie baked fresh today.',
     },
@@ -109,6 +127,9 @@ export default function CustomerExploreFeed({
       price: '$3.99',
       originalPrice: '$13.50',
       remaining: 5,
+      bagsAvailable: 5,
+      isAvailable: true,
+      status: 'ACTIVE',
       category: 'Pastry',
       description: 'Pure French butter croissants, almond escargot pastries, chocolate swirls, and brioche rolls.',
     },
@@ -125,6 +146,9 @@ export default function CustomerExploreFeed({
       price: '$3.50',
       originalPrice: '$12.00',
       remaining: 3,
+      bagsAvailable: 3,
+      isAvailable: true,
+      status: 'ACTIVE',
       category: 'Pastry',
       description: 'Two full-size artisan sourdough boules and crispy European baguettes freshly baked with organic wheat flour.',
     },
@@ -141,6 +165,9 @@ export default function CustomerExploreFeed({
       price: '$4.50',
       originalPrice: '$15.00',
       remaining: 3,
+      bagsAvailable: 3,
+      isAvailable: true,
+      status: 'ACTIVE',
       category: 'Dessert',
       description: 'Fresh fruit tarts, custard brioches, cinnamon glazed knots, and seasonal pastry slices from today.',
     },
@@ -157,6 +184,9 @@ export default function CustomerExploreFeed({
       price: '$4.20',
       originalPrice: '$14.00',
       remaining: 2,
+      bagsAvailable: 2,
+      isAvailable: true,
+      status: 'ACTIVE',
       category: 'Food',
       description: 'Rosemary sea salt focaccia squares, ham and gruyere melt twists, and savory olive rolls.',
     },
@@ -173,6 +203,9 @@ export default function CustomerExploreFeed({
       price: '$2.90',
       originalPrice: '$9.00',
       remaining: 6,
+      bagsAvailable: 6,
+      isAvailable: true,
+      status: 'ACTIVE',
       category: 'Drinks',
       description: 'Bottled organic cold brew coffee or iced matcha latte paired with two fresh breakfast pastries.',
     },
@@ -188,6 +221,9 @@ export default function CustomerExploreFeed({
       price: '$1.80',
       originalPrice: '$3.60',
       remaining: 3,
+      bagsAvailable: 3,
+      isAvailable: true,
+      status: 'ACTIVE',
       category: 'Food',
       description: 'Fresh teriyaki chicken, katsu curry, or daily sushi roll surplus prepared today.',
     },
@@ -203,6 +239,9 @@ export default function CustomerExploreFeed({
       price: '$2.50',
       originalPrice: '$5.00',
       remaining: 5,
+      bagsAvailable: 5,
+      isAvailable: true,
+      status: 'ACTIVE',
       category: 'Pastry',
       description: 'Assortment of fresh meat pies, sausage rolls, spinach feta parcels and sweet danishes.',
     },
@@ -218,6 +257,9 @@ export default function CustomerExploreFeed({
       price: '$6.50',
       originalPrice: '$22.00',
       remaining: 2,
+      bagsAvailable: 2,
+      isAvailable: true,
+      status: 'ACTIVE',
       category: 'Healthy',
       description: 'Assorted seasonal organic vegetables, fruit basket, and dairy surplus items.',
     },
@@ -233,6 +275,7 @@ export default function CustomerExploreFeed({
       price: '$4.00',
       originalPrice: '$10.00',
       remaining: 0,
+      bagsAvailable: 0,
       isAvailable: false,
       status: 'SOLD_OUT',
       category: 'Food',
@@ -246,21 +289,21 @@ export default function CustomerExploreFeed({
     try {
       const data = await getActiveListings(activeCategory === 'All' ? 'all' : activeCategory.toLowerCase(), searchQuery);
       if (Array.isArray(data) && data.length > 0) {
-        const normalized = data.map(normalizeListing);
+        const normalized = data.map(normalizeListing).filter(Boolean);
         // Combine with fallback to ensure full rich visual layout
         const combined = [...normalized];
         fallbackListings.forEach((fb) => {
           if (!combined.some((c) => c.title === fb.title || c.id === fb.id)) {
-            combined.push(fb);
+            combined.push(normalizeListing(fb));
           }
         });
         setListings(combined);
       } else {
-        setListings(fallbackListings);
+        setListings(fallbackListings.map(normalizeListing));
       }
     } catch (err) {
       console.error('Failed to load listings:', err);
-      setListings(fallbackListings);
+      setListings(fallbackListings.map(normalizeListing));
     } finally {
       setIsLoading(false);
     }
@@ -505,7 +548,12 @@ export default function CustomerExploreFeed({
         <div className="flex gap-4 overflow-x-auto pb-4 pt-1 scrollbar-none -mx-3.5 px-3.5 sm:mx-0 sm:px-0">
           {filteredListings.slice(0, 5).map((item, idx) => {
             const isJustAdded = justAddedIds.has(item.id);
-            const isUnavailable = !item.isAvailable || item.remaining <= 0 || item.status === 'PAUSED';
+            const remainingCount = item.remaining !== undefined
+              ? Number(item.remaining)
+              : (item.bagsAvailable !== undefined
+                  ? Number(item.bagsAvailable)
+                  : (item.remainingCount !== undefined ? Number(item.remainingCount) : 1));
+            const isUnavailable = item.isAvailable === false || item.status === 'PAUSED' || item.status === 'SOLD_OUT' || remainingCount <= 0;
             return (
               <div
                 key={item.id}
@@ -670,7 +718,12 @@ export default function CustomerExploreFeed({
           <div className="space-y-4">
             {filteredListings.map((item, idx) => {
               const isJustAdded = justAddedIds.has(item.id);
-              const isUnavailable = !item.isAvailable || item.remaining <= 0 || item.status === 'PAUSED';
+              const remainingCount = item.remaining !== undefined
+                ? Number(item.remaining)
+                : (item.bagsAvailable !== undefined
+                    ? Number(item.bagsAvailable)
+                    : (item.remainingCount !== undefined ? Number(item.remainingCount) : 1));
+              const isUnavailable = item.isAvailable === false || item.status === 'PAUSED' || item.status === 'SOLD_OUT' || remainingCount <= 0;
               return (
               <div
                 key={item.id}
