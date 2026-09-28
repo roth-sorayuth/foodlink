@@ -43,7 +43,11 @@ export default function MerchantListings({
   const normalizeMerchantItem = (item) => {
     const origPriceNum = typeof item.originalPrice === 'number' ? item.originalPrice : parseFloat(item.originalPrice) || 15.0;
     const priceNum = typeof item.price === 'number' ? item.price : parseFloat(item.price) || 4.99;
-    const remaining = item.bagsAvailable !== undefined ? Number(item.bagsAvailable) : (item.remainingCount !== undefined ? Number(item.remainingCount) : 0);
+    const remaining = item.remaining !== undefined
+      ? Number(item.remaining)
+      : (item.bagsAvailable !== undefined
+          ? Number(item.bagsAvailable)
+          : (item.remainingCount !== undefined ? Number(item.remainingCount) : 0));
     const sold = item.bagsSold !== undefined ? Number(item.bagsSold) : (item.soldCount !== undefined ? Number(item.soldCount) : 0);
     const total = remaining + sold;
     const isSoldOut = remaining <= 0;
@@ -62,7 +66,7 @@ export default function MerchantListings({
       remainingCount: remaining,
       totalCount: total,
       earned: `$${(sold * priceNum).toFixed(2)}`,
-      pickupWindow: `${item.pickupStart || '6:30'} – ${item.pickupEnd || '7:30 PM'}`,
+      pickupWindow: `${item.pickupStart || '6:30 PM'} – ${item.pickupEnd || '7:30 PM'}`,
       isPaused: item.status === 'PAUSED',
       raw: item
     };
@@ -75,7 +79,13 @@ export default function MerchantListings({
       if (stored) {
         const parsed = JSON.parse(stored);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed.map(normalizeMerchantItem);
+          const combined = [...parsed];
+          DEFAULT_MERCHANT_LISTINGS.forEach((def) => {
+            if (!combined.some((c) => c.id === def.id || c.title === def.title)) {
+              combined.push(def);
+            }
+          });
+          return combined.map(normalizeMerchantItem);
         }
       }
     } catch (e) {}

@@ -223,9 +223,16 @@ const FALLBACK_LISTINGS = [
  */
 export async function getListings(req, res) {
   try {
-    const { category, search, status } = req.query;
+    const { category, search, status, storeId } = req.query;
 
     const where = {};
+
+    if (storeId) {
+      where.OR = [
+        { storeId: storeId },
+        { store: { id: storeId } },
+      ];
+    }
 
     if (category && category !== 'all') {
       where.category = { equals: category, mode: 'insensitive' };
@@ -236,11 +243,20 @@ export async function getListings(req, res) {
     }
 
     if (search) {
-      where.OR = [
+      const searchCondition = [
         { title: { contains: search, mode: 'insensitive' } },
         { storeName: { contains: search, mode: 'insensitive' } },
         { description: { contains: search, mode: 'insensitive' } },
       ];
+      if (where.OR) {
+        where.AND = [
+          { OR: where.OR },
+          { OR: searchCondition }
+        ];
+        delete where.OR;
+      } else {
+        where.OR = searchCondition;
+      }
     }
 
     const listings = await prisma.listing.findMany({
@@ -253,7 +269,10 @@ export async function getListings(req, res) {
   } catch (error) {
     console.warn('Database unavailable, returning fallback listings:', error.message);
     let results = [...FALLBACK_LISTINGS];
-    const { category, search } = req.query;
+    const { category, search, storeId } = req.query;
+    if (storeId) {
+      results = results.filter(l => l.storeId === storeId || l.store?.id === storeId || (l.storeName && l.storeName.toLowerCase().includes('cad')));
+    }
     if (category && category !== 'all') {
       results = results.filter(l => l.category?.toLowerCase() === category.toLowerCase());
     }

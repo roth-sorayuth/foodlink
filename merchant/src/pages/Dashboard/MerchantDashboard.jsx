@@ -57,10 +57,11 @@ export default function MerchantDashboard({ onNavigateToProfile, onOpenCreate, o
   // Helper to normalize DB listing to dashboard card shape
   const normalizeDashboardItem = (item) => {
     const origPriceNum = typeof item.originalPrice === 'number' ? item.originalPrice : parseFloat(item.originalPrice) || 16.0;
-    const priceNum = typeof item.price === 'number' ? item.price : parseFloat(item.price) || 4.99;
-    const remaining = item.bagsAvailable !== undefined 
-      ? Number(item.bagsAvailable) 
-      : (item.remainingCount !== undefined ? Number(item.remainingCount) : 0);
+    const remaining = item.remaining !== undefined
+      ? Number(item.remaining)
+      : (item.bagsAvailable !== undefined 
+          ? Number(item.bagsAvailable) 
+          : (item.remainingCount !== undefined ? Number(item.remainingCount) : 0));
     const sold = item.bagsSold !== undefined 
       ? Number(item.bagsSold) 
       : (item.soldCount !== undefined ? Number(item.soldCount) : 0);
@@ -214,7 +215,13 @@ export default function MerchantDashboard({ onNavigateToProfile, onOpenCreate, o
       if (stored) {
         const parsed = JSON.parse(stored);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed.map(normalizeDashboardItem);
+          const combined = [...parsed];
+          DEFAULT_MERCHANT_LISTINGS.forEach((def) => {
+            if (!combined.some((c) => c.id === def.id || c.title === def.title)) {
+              combined.push(def);
+            }
+          });
+          return combined.map(normalizeDashboardItem);
         }
       }
     } catch (e) {}

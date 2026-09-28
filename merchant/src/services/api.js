@@ -2,21 +2,62 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
 
 export const DEFAULT_MERCHANT_LISTINGS = [
   {
-    id: 'cad-surprise-sourdough',
-    title: 'Artisan Pastry & Sourdough Surprise Bag',
-    description: "Assortment of today's fresh unsold sourdough loaves, flaky croissants, and daily brioche buns. 100% fresh surplus.",
-    category: 'bakery',
-    photoUrl: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=800&q=80',
+    id: 'cad-sourdough-box',
+    title: 'Artisan Sourdough & Croissant Surprise Box',
+    description: 'Artisanal European sourdough loaves, buttery croissants, and morning viennoiserie baked fresh today.',
+    category: 'pastry',
+    photoUrl: 'https://images.unsplash.com/photo-1555507036-ab1f4038808a?auto=format&fit=crop&w=800&q=80',
     originalPrice: 16.00,
     price: 4.99,
     discount: '69% OFF',
-    bagsAvailable: 5,
-    bagsSold: 7,
+    bagsAvailable: 4,
+    remaining: 4,
+    bagsSold: 18,
     status: 'ACTIVE',
     pickupDate: 'Today',
     pickupStart: '6:30 PM',
     pickupEnd: '7:30 PM',
-    dietaryTags: ['vegetarian'],
+    dietaryTags: ['vegetarian', 'artisan', 'bakery'],
+    storeId: 'st_cad',
+    storeName: 'CAD Bakery',
+  },
+  {
+    id: 'cad-croissant-bundle',
+    title: 'French Butter Croissant & Viennoiserie Bag',
+    description: 'Pure French butter croissants, almond escargot pastries, chocolate swirls, and brioche rolls.',
+    category: 'pastry',
+    photoUrl: 'https://images.unsplash.com/photo-1549931319-a545dcf3bc73?auto=format&fit=crop&w=800&q=80',
+    originalPrice: 13.50,
+    price: 3.99,
+    discount: '70% OFF',
+    bagsAvailable: 5,
+    remaining: 5,
+    bagsSold: 22,
+    status: 'ACTIVE',
+    pickupDate: 'Today',
+    pickupStart: '6:00 PM',
+    pickupEnd: '7:30 PM',
+    dietaryTags: ['vegetarian', 'pastry'],
+    storeId: 'st_cad',
+    storeName: 'CAD Bakery',
+  },
+  {
+    id: 'cad-rustic-breads',
+    title: 'Rustic Country Sourdough & Baguette Pack',
+    description: 'Two full-size artisan sourdough boules and crispy European baguettes freshly baked with organic wheat flour.',
+    category: 'pastry',
+    photoUrl: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=800&q=80',
+    originalPrice: 12.00,
+    price: 3.50,
+    discount: '71% OFF',
+    bagsAvailable: 3,
+    remaining: 3,
+    bagsSold: 14,
+    status: 'ACTIVE',
+    pickupDate: 'Today',
+    pickupStart: '6:30 PM',
+    pickupEnd: '8:00 PM',
+    dietaryTags: ['vegan', 'organic'],
     storeId: 'st_cad',
     storeName: 'CAD Bakery',
   },
@@ -30,6 +71,7 @@ export const DEFAULT_MERCHANT_LISTINGS = [
     price: 4.50,
     discount: '70% OFF',
     bagsAvailable: 3,
+    remaining: 3,
     bagsSold: 9,
     status: 'ACTIVE',
     pickupDate: 'Today',
@@ -49,6 +91,7 @@ export const DEFAULT_MERCHANT_LISTINGS = [
     price: 4.20,
     discount: '70% OFF',
     bagsAvailable: 2,
+    remaining: 2,
     bagsSold: 11,
     status: 'ACTIVE',
     pickupDate: 'Today',
@@ -68,6 +111,7 @@ export const DEFAULT_MERCHANT_LISTINGS = [
     price: 2.90,
     discount: '68% OFF',
     bagsAvailable: 6,
+    remaining: 6,
     bagsSold: 15,
     status: 'ACTIVE',
     pickupDate: 'Today',
@@ -83,15 +127,54 @@ export const DEFAULT_MERCHANT_LISTINGS = [
  * Fetch all listings for merchant (with offline & localStorage fallback)
  */
 export async function getMerchantListings() {
+  const signatureOrder = [
+    'cad-sourdough-box',
+    'cad-croissant-bundle',
+    'cad-rustic-breads',
+    'cad-sweet-dessert-box',
+    'cad-savory-focaccia',
+    'cad-coffee-pastry-pair',
+  ];
+
+  const sortWithSignatureFirst = (items) => {
+    return items.sort((a, b) => {
+      const idxA = signatureOrder.indexOf(a.id);
+      const idxB = signatureOrder.indexOf(b.id);
+      if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+      if (idxA !== -1) return -1;
+      if (idxB !== -1) return 1;
+      return 0;
+    });
+  };
+
   try {
-    const res = await fetch(`${API_BASE_URL}/listings`);
+    const res = await fetch(`${API_BASE_URL}/listings?storeId=st_cad`);
     if (res.ok) {
       const data = await res.json();
       if (Array.isArray(data) && data.length > 0) {
+        // Filter for CAD Bakery / this merchant store
+        const cadItems = data.filter(
+          (item) =>
+            item.storeId === 'st_cad' ||
+            item.store?.id === 'st_cad' ||
+            (item.storeName && item.storeName.toLowerCase().includes('cad')) ||
+            (item.store?.name && item.store?.name.toLowerCase().includes('cad')) ||
+            (item.id && String(item.id).startsWith('cad-'))
+        );
+
+        // Merge with DEFAULT_MERCHANT_LISTINGS so all 6 signature types are always represented
+        const combined = [...cadItems];
+        DEFAULT_MERCHANT_LISTINGS.forEach((def) => {
+          if (!combined.some((c) => c.id === def.id || c.title === def.title)) {
+            combined.push(def);
+          }
+        });
+
+        const sorted = sortWithSignatureFirst(combined);
         try {
-          localStorage.setItem('foodlink_merchant_listings', JSON.stringify(data));
+          localStorage.setItem('foodlink_merchant_listings', JSON.stringify(sorted));
         } catch (e) {}
-        return data;
+        return sorted;
       }
     }
   } catch (error) {
@@ -103,7 +186,15 @@ export async function getMerchantListings() {
     const cached = localStorage.getItem('foodlink_merchant_listings');
     if (cached) {
       const parsed = JSON.parse(cached);
-      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        const combined = [...parsed];
+        DEFAULT_MERCHANT_LISTINGS.forEach((def) => {
+          if (!combined.some((c) => c.id === def.id || c.title === def.title)) {
+            combined.push(def);
+          }
+        });
+        return sortWithSignatureFirst(combined);
+      }
     }
   } catch (e) {}
 
