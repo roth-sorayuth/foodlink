@@ -5,7 +5,7 @@
 
 export function getOptimizedImageUrl(url, options = {}) {
   if (!url || typeof url !== 'string') {
-    return 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=400&q=70';
+    return 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=360&q=60';
   }
 
   // Handle local public assets or data URLs directly
@@ -18,9 +18,9 @@ export function getOptimizedImageUrl(url, options = {}) {
     try {
       const parsedUrl = new URL(url);
       const {
-        width = 400,
+        width = 360,
         height = null,
-        quality = 70,
+        quality = 60,
         fit = 'crop',
         format = 'auto',
       } = options;

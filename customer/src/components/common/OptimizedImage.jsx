@@ -1,14 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { getOptimizedImageUrl } from '../../utils/imageOptimizer';
 
-const DEFAULT_FALLBACK = 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=400&q=70';
+const DEFAULT_FALLBACK = 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=360&q=60';
 
 /**
  * Reusable progressive image component with:
  * - Dynamic Unsplash size/quality optimization (drastically cuts payload)
  * - Shimmer skeleton placeholder to prevent layout shifts
- * - Smooth fade-in transition once loaded
- * - Priority hints (fetchPriority="high" & loading="eager" for LCP)
+ * - Instant rendering for priority images and browser-cached assets
+ * - Priority hints (fetchPriority="high" & loading="eager")
  * - Graceful error fallback
  */
 export default function OptimizedImage({
@@ -16,9 +16,9 @@ export default function OptimizedImage({
   alt = '',
   className = '',
   containerClassName = '',
-  width = 400,
+  width = 360,
   height = null,
-  quality = 70,
+  quality = 60,
   priority = false,
   fallbackSrc = DEFAULT_FALLBACK,
   style = {},
@@ -27,6 +27,7 @@ export default function OptimizedImage({
 }) {
   const [isLoaded, setIsLoaded] = useState(false);
   const [hasError, setHasError] = useState(false);
+  const imgRef = useRef(null);
 
   // Compute optimized URL
   const optimizedUrl = getOptimizedImageUrl(hasError ? fallbackSrc : src, {
@@ -35,27 +36,36 @@ export default function OptimizedImage({
     quality,
   });
 
-  // Reset loading status if src changes
+  // Check if image is already cached/complete on mount or ref attach
+  const handleRef = (el) => {
+    imgRef.current = el;
+    if (el && el.complete && el.naturalWidth > 0) {
+      setIsLoaded(true);
+    }
+  };
+
   useEffect(() => {
-    setIsLoaded(false);
-    setHasError(false);
-  }, [src]);
+    if (imgRef.current && imgRef.current.complete && imgRef.current.naturalWidth > 0) {
+      setIsLoaded(true);
+    }
+  }, [optimizedUrl]);
 
   return (
     <div
-      className={`relative overflow-hidden ${containerClassName}`}
+      className={`relative overflow-hidden bg-stone-100 ${containerClassName}`}
       style={style}
     >
-      {/* Shimmer skeleton placeholder displayed while loading */}
-      {!isLoaded && (
+      {/* Background skeleton: only show if not loaded and not priority */}
+      {!isLoaded && !priority && (
         <div
-          className="absolute inset-0 bg-gradient-to-r from-stone-200 via-stone-100 to-stone-200 bg-[length:200%_100%] animate-[shimmer_1.5s_infinite] pointer-events-none z-0"
+          className="absolute inset-0 bg-gradient-to-r from-stone-200/70 via-stone-100 to-stone-200/70 bg-[length:200%_100%] animate-[shimmer_1.5s_infinite] pointer-events-none z-0"
           aria-hidden="true"
         />
       )}
 
-      {/* Actual optimized image */}
+      {/* Actual image */}
       <img
+        ref={handleRef}
         src={optimizedUrl}
         alt={alt}
         loading={priority ? 'eager' : 'lazy'}
@@ -69,8 +79,8 @@ export default function OptimizedImage({
             setIsLoaded(true);
           }
         }}
-        className={`w-full h-full transition-opacity duration-300 ease-out ${
-          isLoaded ? 'opacity-100' : 'opacity-0'
+        className={`w-full h-full transition-opacity duration-200 ease-out ${
+          isLoaded || priority ? 'opacity-100' : 'opacity-0'
         } ${className}`}
         style={imgStyle}
         {...props}

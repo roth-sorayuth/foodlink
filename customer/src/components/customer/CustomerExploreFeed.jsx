@@ -68,16 +68,16 @@ export default function CustomerExploreFeed({
       ? Boolean(item.isAvailable)
       : (remaining > 0 && item.status !== 'PAUSED' && item.status !== 'SOLD_OUT');
 
-    const rawImage = item.photoUrl || item.image || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=480&q=70';
-    const rawLogo = item.store?.logoUrl || (item.storeName?.includes('CAD') || item.title?.includes('CAD') ? '/cad-bakery-logo.png' : null) || item.photoUrl || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=96&q=70';
+    const rawImage = item.photoUrl || item.image || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=360&q=60';
+    const rawLogo = item.store?.logoUrl || (item.storeName?.includes('CAD') || item.title?.includes('CAD') ? '/cad-bakery-logo.png' : null) || item.photoUrl || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=96&q=60';
 
     return {
       id: item.id,
       store: item.storeName || item.store?.name || item.store || 'CAD Bakery',
-      storeLogo: getOptimizedImageUrl(rawLogo, { width: 96, height: 96, quality: 70 }),
+      storeLogo: rawLogo,
       title: item.title,
       description: item.description,
-      image: getOptimizedImageUrl(rawImage, { width: 480, quality: 70 }),
+      image: rawImage,
       rating: item.store?.rating ? String(item.store.rating) : (item.rating ? String(item.rating) : '4.9'),
       distance: item.store?.distance || item.distance || '0.4 km',
       pickupTime: item.pickupStart ? `${item.pickupStart}–${item.pickupEnd}` : (item.pickupTime || '6:30 PM–7:30 PM'),
@@ -572,9 +572,9 @@ export default function CustomerExploreFeed({
                   <OptimizedImage
                     src={item.image}
                     alt={item.store}
-                    width={400}
-                    quality={70}
-                    priority={idx === 0}
+                    width={360}
+                    quality={60}
+                    priority={idx < 4}
                     className="w-full h-full object-cover group-hover:scale-108 transition-transform duration-700 ease-out"
                     containerClassName="w-full h-full"
                   />
@@ -607,7 +607,8 @@ export default function CustomerExploreFeed({
                       alt={item.store}
                       width={96}
                       height={96}
-                      quality={70}
+                      quality={60}
+                      priority={true}
                       className="w-full h-full object-cover"
                       containerClassName="w-full h-full"
                     />
@@ -742,9 +743,9 @@ export default function CustomerExploreFeed({
                   <OptimizedImage
                     src={item.image}
                     alt={item.store}
-                    width={520}
-                    quality={70}
-                    priority={idx === 0}
+                    width={400}
+                    quality={60}
+                    priority={idx < 2}
                     className="w-full h-full object-cover group-hover:scale-106 transition-transform duration-700 ease-out"
                     containerClassName="w-full h-full"
                   />
@@ -777,7 +778,8 @@ export default function CustomerExploreFeed({
                       alt={item.store}
                       width={96}
                       height={96}
-                      quality={70}
+                      quality={60}
+                      priority={true}
                       className="w-full h-full object-cover"
                       containerClassName="w-full h-full"
                     />
