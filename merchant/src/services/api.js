@@ -1,5 +1,28 @@
 import { io } from 'socket.io-client';
 
+// Bump this version to force a full localStorage reset on deploy
+const MERCHANT_APP_VERSION = '2';
+const MERCHANT_APP_VERSION_KEY = 'foodlink_merchant_app_version';
+
+(function cleanupStaleMerchantStorage() {
+  try {
+    const storedVersion = localStorage.getItem(MERCHANT_APP_VERSION_KEY);
+    if (storedVersion !== MERCHANT_APP_VERSION) {
+      const keysToRemove = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith('foodlink_')) {
+          keysToRemove.push(key);
+        }
+      }
+      keysToRemove.forEach((k) => localStorage.removeItem(k));
+      localStorage.setItem(MERCHANT_APP_VERSION_KEY, MERCHANT_APP_VERSION);
+    }
+  } catch (e) {
+    // Ignore storage errors
+  }
+})();
+
 const isLocalhost = typeof window !== 'undefined' &&
   (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
 

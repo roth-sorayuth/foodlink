@@ -1,10 +1,34 @@
 /**
  * FoodLink Customer Isolation & Multi-Item Cart Session Manager
  * Ensures that each device scanning the QR code gets an isolated session:
- * - Unique user ID and demo persona (e.g. Sreypov K., Dara Sok, etc.)
+ * - Unique user ID and demo persona (always Dara Sok)
  * - Isolated multi-item bag/cart
  * - Isolated active pickup passes & orders
  */
+
+// Bump this version whenever you want to force a full localStorage reset on deploy
+const APP_VERSION = '2';
+const APP_VERSION_KEY = 'foodlink_app_version';
+
+// Wipe all stale foodlink_ keys when version changes
+(function cleanupStaleStorage() {
+  try {
+    const storedVersion = localStorage.getItem(APP_VERSION_KEY);
+    if (storedVersion !== APP_VERSION) {
+      const keysToRemove = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith('foodlink_')) {
+          keysToRemove.push(key);
+        }
+      }
+      keysToRemove.forEach((k) => localStorage.removeItem(k));
+      localStorage.setItem(APP_VERSION_KEY, APP_VERSION);
+    }
+  } catch (e) {
+    // Ignore storage errors
+  }
+})();
 
 const USER_KEY = 'foodlink_customer_user_v3';
 const CART_KEY_PREFIX = 'foodlink_cart_';
