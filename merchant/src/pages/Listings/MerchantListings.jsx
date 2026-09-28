@@ -73,24 +73,9 @@ export default function MerchantListings({
   };
 
   // Listings State
-  const [listings, setListings] = useState(() => {
-    try {
-      const stored = localStorage.getItem('foodlink_merchant_listings');
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          const combined = [...parsed];
-          DEFAULT_MERCHANT_LISTINGS.forEach((def) => {
-            if (!combined.some((c) => c.id === def.id || c.title === def.title)) {
-              combined.push(def);
-            }
-          });
-          return combined.map(normalizeMerchantItem);
-        }
-      }
-    } catch (e) {}
-    return DEFAULT_MERCHANT_LISTINGS.map(normalizeMerchantItem);
-  });
+  const [listings, setListings] = useState(() =>
+    DEFAULT_MERCHANT_LISTINGS.map(normalizeMerchantItem)
+  );
 
   // Fetch initial listings from database
   const loadListings = async () => {

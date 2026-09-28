@@ -114,16 +114,7 @@ const CATEGORY_PRESETS = {
 export default function CreateListingPage({ onBack, onSave, onNavigateToProfile, initialListing = null }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [editingItemId, setEditingItemId] = useState(initialListing?.id || null);
-  const [previousListings, setPreviousListings] = useState(() => {
-    try {
-      const stored = localStorage.getItem('foodlink_merchant_listings');
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      }
-    } catch (e) {}
-    return DEFAULT_MERCHANT_LISTINGS;
-  });
+  const [previousListings, setPreviousListings] = useState(() => DEFAULT_MERCHANT_LISTINGS);
 
   const [photoUrl, setPhotoUrl] = useState(
     initialListing?.image || initialListing?.photoUrl || 'https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=800&q=80'

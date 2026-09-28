@@ -209,24 +209,9 @@ export default function MerchantDashboard({ onNavigateToProfile, onOpenCreate, o
   }, []);
 
   // Listings State
-  const [listings, setListings] = useState(() => {
-    try {
-      const stored = localStorage.getItem('foodlink_merchant_listings');
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          const combined = [...parsed];
-          DEFAULT_MERCHANT_LISTINGS.forEach((def) => {
-            if (!combined.some((c) => c.id === def.id || c.title === def.title)) {
-              combined.push(def);
-            }
-          });
-          return combined.map(normalizeDashboardItem);
-        }
-      }
-    } catch (e) {}
-    return DEFAULT_MERCHANT_LISTINGS.map(normalizeDashboardItem);
-  });
+  const [listings, setListings] = useState(() =>
+    DEFAULT_MERCHANT_LISTINGS.map(normalizeDashboardItem)
+  );
 
   // Reservations State
   const [reservations, setReservations] = useState([

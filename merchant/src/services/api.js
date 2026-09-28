@@ -124,7 +124,7 @@ export const DEFAULT_MERCHANT_LISTINGS = [
 ];
 
 /**
- * Fetch all listings for merchant (with offline & localStorage fallback)
+ * Fetch all listings for merchant directly from backend database
  */
 export async function getMerchantListings() {
   const signatureOrder = [
@@ -137,7 +137,7 @@ export async function getMerchantListings() {
   ];
 
   const sortWithSignatureFirst = (items) => {
-    return items.sort((a, b) => {
+    return [...items].sort((a, b) => {
       const idxA = signatureOrder.indexOf(a.id);
       const idxB = signatureOrder.indexOf(b.id);
       if (idxA !== -1 && idxB !== -1) return idxA - idxB;
@@ -152,7 +152,7 @@ export async function getMerchantListings() {
     if (res.ok) {
       const data = await res.json();
       if (Array.isArray(data) && data.length > 0) {
-        // Filter for CAD Bakery / this merchant store
+        // Filter for CAD Bakery
         const cadItems = data.filter(
           (item) =>
             item.storeId === 'st_cad' ||
@@ -162,43 +162,14 @@ export async function getMerchantListings() {
             (item.id && String(item.id).startsWith('cad-'))
         );
 
-        // Merge with DEFAULT_MERCHANT_LISTINGS so all 6 signature types are always represented
-        const combined = [...cadItems];
-        DEFAULT_MERCHANT_LISTINGS.forEach((def) => {
-          if (!combined.some((c) => c.id === def.id || c.title === def.title)) {
-            combined.push(def);
-          }
-        });
-
-        const sorted = sortWithSignatureFirst(combined);
-        try {
-          localStorage.setItem('foodlink_merchant_listings', JSON.stringify(sorted));
-        } catch (e) {}
-        return sorted;
+        return sortWithSignatureFirst(cadItems.length > 0 ? cadItems : data);
       }
     }
   } catch (error) {
-    console.warn('API error fetching listings, falling back to local cache/defaults:', error.message);
+    console.warn('API error fetching listings, using defaults:', error.message);
   }
 
-  // Fallback to localStorage or default seed listings
-  try {
-    const cached = localStorage.getItem('foodlink_merchant_listings');
-    if (cached) {
-      const parsed = JSON.parse(cached);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        const combined = [...parsed];
-        DEFAULT_MERCHANT_LISTINGS.forEach((def) => {
-          if (!combined.some((c) => c.id === def.id || c.title === def.title)) {
-            combined.push(def);
-          }
-        });
-        return sortWithSignatureFirst(combined);
-      }
-    }
-  } catch (e) {}
-
-  return DEFAULT_MERCHANT_LISTINGS;
+  return sortWithSignatureFirst(DEFAULT_MERCHANT_LISTINGS);
 }
 
 /**
@@ -218,7 +189,7 @@ export async function publishListing(listingData) {
       created = result.listing || result;
     }
   } catch (error) {
-    console.warn('API error publishing listing, storing locally:', error.message);
+    console.warn('API error publishing listing:', error.message);
   }
 
   if (!created) {
@@ -230,12 +201,6 @@ export async function publishListing(listingData) {
       createdAt: new Date().toISOString(),
     };
   }
-
-  try {
-    const cached = JSON.parse(localStorage.getItem('foodlink_merchant_listings') || JSON.stringify(DEFAULT_MERCHANT_LISTINGS));
-    const updated = [created, ...cached.filter((l) => l.id !== created.id)];
-    localStorage.setItem('foodlink_merchant_listings', JSON.stringify(updated));
-  } catch (e) {}
 
   return { success: true, listing: created };
 }
@@ -265,25 +230,8 @@ export async function updateMerchantListing(id, updateData) {
       updated = result.listing || result;
     }
   } catch (error) {
-    console.warn('API error updating listing, updating locally:', error.message);
+    console.warn('API error updating listing:', error.message);
   }
-
-  try {
-    const cached = JSON.parse(localStorage.getItem('foodlink_merchant_listings') || JSON.stringify(DEFAULT_MERCHANT_LISTINGS));
-    const idx = cached.findIndex((l) => l.id === id);
-    if (idx !== -1) {
-      cached[idx] = { 
-        ...cached[idx], 
-        ...dataToSend,
-        status: dataToSend.status || (cached[idx].bagsAvailable > 0 ? 'ACTIVE' : 'SOLD_OUT')
-      };
-      updated = cached[idx];
-    } else {
-      updated = { id, ...dataToSend };
-      cached.unshift(updated);
-    }
-    localStorage.setItem('foodlink_merchant_listings', JSON.stringify(cached));
-  } catch (e) {}
 
   return { success: true, listing: updated || { id, ...dataToSend } };
 }
@@ -297,14 +245,8 @@ export async function deleteMerchantListing(id) {
       method: 'DELETE',
     });
   } catch (error) {
-    console.warn('API error deleting listing, deleting locally:', error.message);
+    console.warn('API error deleting listing:', error.message);
   }
-
-  try {
-    const cached = JSON.parse(localStorage.getItem('foodlink_merchant_listings') || JSON.stringify(DEFAULT_MERCHANT_LISTINGS));
-    const filtered = cached.filter((l) => l.id !== id);
-    localStorage.setItem('foodlink_merchant_listings', JSON.stringify(filtered));
-  } catch (e) {}
 
   return { success: true };
 }
