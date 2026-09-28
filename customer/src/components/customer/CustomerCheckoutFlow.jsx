@@ -46,15 +46,22 @@ export default function CustomerCheckoutFlow({
   const address = primaryItem?.address || primaryItem?.store?.address || '422 St 178, Daun Penh, Phnom Penh';
   const pickupWindow = primaryItem?.pickupTime || `${primaryItem?.pickupStart || '6:30 PM'} – ${primaryItem?.pickupEnd || '7:30 PM'}`;
 
-  const handleConfirm = () => {
+  const handleConfirm = async () => {
+    if (isSubmitting) return;
     setIsSubmitting(true);
-    if (onConfirmPayment) {
-      onConfirmPayment({
-        items,
-        totalQty,
-        totalDue: totalDue.toFixed(2),
-        paymentMethod: 'khqr'
-      });
+    try {
+      if (onConfirmPayment) {
+        await onConfirmPayment({
+          items,
+          totalQty,
+          totalDue: totalDue.toFixed(2),
+          paymentMethod: 'khqr'
+        });
+      }
+    } catch (err) {
+      console.error('Checkout error:', err);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
