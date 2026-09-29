@@ -268,12 +268,30 @@ export async function getListings(req, res) {
       include: { store: true },
     });
 
-    const results = [...listings];
+    let results = [...listings];
+    if (results.length === 0) {
+      let fallback = [...FALLBACK_LISTINGS];
+      if (category && category !== 'all') {
+        const catLower = category.toLowerCase();
+        fallback = fallback.filter((f) => (f.category || '').toLowerCase() === catLower);
+      }
+      if (search) {
+        const q = search.toLowerCase();
+        fallback = fallback.filter(
+          (f) =>
+            (f.title || '').toLowerCase().includes(q) ||
+            (f.storeName || '').toLowerCase().includes(q) ||
+            (f.description || '').toLowerCase().includes(q)
+        );
+      }
+      results = fallback;
+    }
+
     results.sort((a, b) => (Number(b.bagsAvailable) || 0) - (Number(a.bagsAvailable) || 0));
     return res.json(results);
   } catch (error) {
     console.warn('Database error in getListings:', error.message);
-    return res.json([]);
+    return res.json(FALLBACK_LISTINGS);
   }
 }
 

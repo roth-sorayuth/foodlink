@@ -30,6 +30,7 @@ import {
   updateMerchantListing,
   verifyOrderPickup,
   notifyCustomerNewListing,
+  getCustomMerchantListings,
   DEFAULT_MERCHANT_LISTINGS
 } from '../../services/api';
 import { socket } from '../../services/socket';
@@ -231,8 +232,12 @@ export default function MerchantDashboard({ onNavigateToProfile, onOpenCreate, o
     };
   }, []);
 
-  // Listings State - starts empty, filled by API fetch
-  const [listings, setListings] = useState([]);
+  // Listings State initialized with custom + default items immediately
+  const [listings, setListings] = useState(() => {
+    const custom = getCustomMerchantListings();
+    const all = [...custom, ...DEFAULT_MERCHANT_LISTINGS.filter((d) => !custom.some((c) => c.id === d.id))];
+    return all.map(normalizeDashboardItem);
+  });
 
   // Reservations State - starts empty, filled by real orders
   const [reservations, setReservations] = useState([]);

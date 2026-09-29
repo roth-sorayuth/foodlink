@@ -14,7 +14,7 @@ import {
   X,
   Plus,
 } from 'lucide-react';
-import { socket, getActiveListings, playNotificationSound, onNewListingDrop } from '../../services/api';
+import { socket, getActiveListings, playNotificationSound, onNewListingDrop, getInitialCustomerListings } from '../../services/api';
 import OptimizedImage from '../common/OptimizedImage';
 import { getOptimizedImageUrl } from '../../utils/imageOptimizer';
 
@@ -32,22 +32,7 @@ export default function CustomerExploreFeed({
   const [activeCategory, setActiveCategory] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
   const [favorites, setFavorites] = useState(['mori-bistro']);
-  const [listings, setListings] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [justAddedIds, setJustAddedIds] = useState(new Set());
-  const [liveBannerListing, setLiveBannerListing] = useState(null);
-
-  const categories = [
-    { id: 'All', label: 'All' },
-    { id: 'Pastry', label: 'Pastry' },
-    { id: 'Asian', label: 'Asian' },
-    { id: 'Italian', label: 'Italian' },
-    { id: 'Healthy', label: 'Healthy' },
-    { id: 'Food', label: 'Food' },
-    { id: 'Dessert', label: 'Dessert' },
-    { id: 'Drinks', label: 'Drinks' },
-  ];
-
+  
   // Helper to normalize listings into the UMAMI card shape from the screenshot
   const normalizeListing = (item) => {
     if (!item) return null;
@@ -93,20 +78,36 @@ export default function CustomerExploreFeed({
     };
   };
 
-  // 1. Fetch live listings from backend DB (strictly real merchant listings)
+  // Instant display on first open or refresh using cached or default listings
+  const [listings, setListings] = useState(() => {
+    const initial = getInitialCustomerListings();
+    return Array.isArray(initial) ? initial.map(normalizeListing).filter(Boolean) : [];
+  });
+  const [isLoading, setIsLoading] = useState(false);
+  const [justAddedIds, setJustAddedIds] = useState(new Set());
+  const [liveBannerListing, setLiveBannerListing] = useState(null);
+
+  const categories = [
+    { id: 'All', label: 'All' },
+    { id: 'Pastry', label: 'Pastry' },
+    { id: 'Asian', label: 'Asian' },
+    { id: 'Italian', label: 'Italian' },
+    { id: 'Healthy', label: 'Healthy' },
+    { id: 'Food', label: 'Food' },
+    { id: 'Dessert', label: 'Dessert' },
+    { id: 'Drinks', label: 'Drinks' },
+  ];
+
+  // 1. Fetch live listings from backend DB / cloud pub-sub
   const loadListings = async () => {
-    setIsLoading(true);
     try {
       const data = await getActiveListings(activeCategory === 'All' ? 'all' : activeCategory.toLowerCase(), searchQuery);
-      if (Array.isArray(data)) {
+      if (Array.isArray(data) && data.length > 0) {
         const normalized = data.map(normalizeListing).filter(Boolean);
         setListings(normalized);
-      } else {
-        setListings([]);
       }
     } catch (err) {
-      console.error('Failed to load listings:', err);
-      setListings([]);
+      console.warn('Failed to load listings:', err);
     } finally {
       setIsLoading(false);
     }
