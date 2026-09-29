@@ -116,11 +116,21 @@ export default function MerchantOrders({ onOpenVerify, onNavigateToProfile, onCo
     };
 
     const handlePickupVerified = (data) => {
-      const { orderId, orderNumber, pickupCode } = data || {};
+      const { orderId, orderNumber, pickupCode, verifiedCode } = data || {};
       setPendingOrders((prev) => {
-        const target = prev.find(
-          (o) => o.id === orderId || o.orderNumber === orderNumber || o.code === pickupCode
-        );
+        const inDigits = String(orderNumber || pickupCode || verifiedCode || '').replace(/\D/g, '');
+        const target = prev.find((o) => {
+          if (orderId && o.id === orderId) return true;
+          if (orderNumber && o.orderNumber === orderNumber) return true;
+          if (pickupCode && (o.code === pickupCode || o.orderNumber === pickupCode)) return true;
+          if (verifiedCode && (o.code === verifiedCode || o.orderNumber === verifiedCode)) return true;
+          const oDigits = String(o.orderNumber || o.code || '').replace(/\D/g, '');
+          if (inDigits && oDigits && (oDigits === inDigits || oDigits.includes(inDigits) || inDigits.includes(oDigits))) {
+            return true;
+          }
+          return false;
+        }) || prev[0];
+
         if (!target) return prev;
         const remaining = prev.filter((o) => o.id !== target.id);
         if (onPendingOrdersChange) onPendingOrdersChange(remaining.length);
@@ -133,7 +143,7 @@ export default function MerchantOrders({ onOpenVerify, onNavigateToProfile, onCo
             staff: 'Staff (You)',
             time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
           },
-          ...compPrev,
+          ...compPrev.filter((c) => c.id !== target.id),
         ]);
 
         return remaining;

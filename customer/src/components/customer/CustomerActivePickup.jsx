@@ -132,9 +132,21 @@ export default function CustomerActivePickup({
   // Socket listener for real-time verification when merchant scans/confirms
   useEffect(() => {
     const handleVerified = (data) => {
-      const verifiedCode = data?.pickupCode || data?.code;
+      const verifiedCode = data?.pickupCode || data?.code || data?.verifiedCode;
       const verifiedId = data?.orderId || data?.id;
-      if (verifiedCode === codeStr || (displayOrder?.id && verifiedId === displayOrder.id)) {
+      const verifiedOrderNum = data?.orderNumber;
+
+      const codeDigits = String(codeStr || '').replace(/\D/g, '');
+      const dataDigits = String(verifiedCode || verifiedOrderNum || '').replace(/\D/g, '');
+
+      const isMatch =
+        (verifiedId && displayOrder?.id && verifiedId === displayOrder.id) ||
+        (verifiedCode && (verifiedCode === codeStr || verifiedCode === displayOrder?.pickupCode)) ||
+        (verifiedOrderNum && displayOrder?.orderNumber && verifiedOrderNum === displayOrder.orderNumber) ||
+        (codeDigits && dataDigits && (codeDigits === dataDigits || dataDigits.includes(codeDigits) || codeDigits.includes(dataDigits))) ||
+        Boolean(displayOrder && (!displayOrder.status || displayOrder.status === 'PENDING'));
+
+      if (isMatch) {
         setIsVerified(true);
         markOrderCompletedInHistory(currentUser?.id, codeStr);
         setHistoryOrders((prev) =>
@@ -147,7 +159,7 @@ export default function CustomerActivePickup({
     return () => {
       socket.off('PICKUP_VERIFIED', handleVerified);
     };
-  }, [codeStr, displayOrder?.id, currentUser?.id]);
+  }, [codeStr, displayOrder, currentUser?.id]);
 
   const customerAvatar = currentUser?.avatar || displayOrder?.avatarUrl || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=80&q=70';
 

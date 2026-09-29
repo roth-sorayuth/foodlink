@@ -21,15 +21,15 @@ export default function VerifyPickupPage({ onBack, onCompleteHandover, initialCo
   const [isVerifying, setIsVerifying] = useState(false);
 
   const handleCodeChange = (val) => {
-    // Sanitize to alphanumeric/digits, up to 10 chars
-    const cleaned = val.replace(/[^0-9a-zA-Z#-]/g, '').slice(0, 10);
+    // Sanitize to alphanumeric/digits, hash, dashes, spaces, up to 30 chars
+    const cleaned = val.replace(/[^0-9a-zA-Z#-\s]/g, '').slice(0, 30);
     setCode(cleaned);
   };
 
   // Dynamically look up the real order in the database whenever code changes
   useEffect(() => {
     const cleanCode = code ? code.trim() : '';
-    if (!cleanCode || cleanCode.length < 3) {
+    if (!cleanCode) {
       setMatchedOrder(null);
       setSearchError(null);
       return;
@@ -47,16 +47,16 @@ export default function VerifyPickupPage({ onBack, onCompleteHandover, initialCo
             setSearchError(null);
           }
         })
-        .catch(() => {
+        .catch((err) => {
           if (isMounted) {
             setMatchedOrder(null);
-            setSearchError(`No reservation found matching "${cleanCode}"`);
+            setSearchError(err.message || `No reservation found matching "${cleanCode}"`);
           }
         })
         .finally(() => {
           if (isMounted) setIsSearching(false);
         });
-    }, 200);
+    }, 150);
 
     return () => {
       isMounted = false;

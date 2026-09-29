@@ -171,13 +171,29 @@ export default function OrderNotificationMenu({ onNavigateToOrders, onOpenVerify
     // Listen to real-time PICKUP_VERIFIED socket broadcast
     const handlePickupVerified = (data) => {
       console.log('⚡ [Merchant Notification] Pickup Verified:', data);
+      const inDigits = String(data?.orderNumber || data?.pickupCode || data?.verifiedCode || '').replace(/\D/g, '');
+
       setNotifications((prev) =>
         prev.map((item) => {
+          const itemDigits = String(item.orderNumber || item.pickupCode || '').replace(/\D/g, '');
           const isMatch =
-            (data.orderId && item.orderId === data.orderId) ||
-            (data.pickupCode && item.pickupCode === data.pickupCode) ||
-            (data.orderNumber && item.orderNumber === data.orderNumber);
+            (data?.orderId && item.orderId === data.orderId) ||
+            (data?.pickupCode && (item.pickupCode === data.pickupCode || item.orderNumber === data.pickupCode)) ||
+            (data?.orderNumber && item.orderNumber === data.orderNumber) ||
+            (inDigits && itemDigits && (inDigits === itemDigits || inDigits.includes(itemDigits) || itemDigits.includes(inDigits)));
           return isMatch ? { ...item, status: 'COMPLETED', isRead: true } : item;
+        })
+      );
+      setUnreadCount((prev) => Math.max(0, prev - 1));
+    };
+
+    const handleNotificationRemoved = (data) => {
+      console.log('⚡ [Merchant Notification] Notification Removed:', data);
+      setNotifications((prev) =>
+        prev.filter((item) => {
+          if (data?.orderId && item.orderId === data.orderId) return false;
+          if (data?.pickupCode && (item.pickupCode === data.pickupCode || item.orderNumber === data.pickupCode)) return false;
+          return true;
         })
       );
       setUnreadCount((prev) => Math.max(0, prev - 1));
@@ -185,10 +201,12 @@ export default function OrderNotificationMenu({ onNavigateToOrders, onOpenVerify
 
     socket.on('ORDER_CREATED', handleNewOrder);
     socket.on('PICKUP_VERIFIED', handlePickupVerified);
+    socket.on('NOTIFICATION_REMOVED', handleNotificationRemoved);
 
     return () => {
       socket.off('ORDER_CREATED', handleNewOrder);
       socket.off('PICKUP_VERIFIED', handlePickupVerified);
+      socket.off('NOTIFICATION_REMOVED', handleNotificationRemoved);
     };
   }, [onNewOrder]);
 

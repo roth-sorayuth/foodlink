@@ -49,6 +49,11 @@ export async function getNotifications(req, res) {
       const isCompleted = order?.status === 'COMPLETED';
       const listing = n.listingId ? listingsMap[n.listingId] || null : null;
 
+      // Exclude previous action order notifications if the order was already confirmed/picked up (COMPLETED)
+      if (n.type === 'ORDER_CONFIRMED' && (isCompleted || !order)) {
+        return null;
+      }
+
       // Never display a NEW_LISTING notification if the food listing does not exist in the database
       if (n.type === 'NEW_LISTING' && !listing) {
         return null;

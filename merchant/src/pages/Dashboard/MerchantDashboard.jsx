@@ -220,14 +220,43 @@ export default function MerchantDashboard({ onNavigateToProfile, onOpenCreate, o
       }
     };
 
+    const handlePickupVerified = (data) => {
+      setNewOrderAlert((prev) => {
+        if (!prev) return null;
+        if (!data) return null;
+        const inDigits = String(data.orderNumber || data.pickupCode || data.verifiedCode || '').replace(/\D/g, '');
+        const prevDigits = String(prev.orderNumber || prev.pickupCode || prev.code || '').replace(/\D/g, '');
+        const isMatch =
+          (data.orderId && prev.id === data.orderId) ||
+          (data.pickupCode && (prev.pickupCode === data.pickupCode || prev.code === data.pickupCode)) ||
+          (data.orderNumber && prev.orderNumber === data.orderNumber) ||
+          (inDigits && prevDigits && (inDigits === prevDigits || inDigits.includes(prevDigits) || prevDigits.includes(inDigits)));
+        return isMatch ? null : prev;
+      });
+    };
+
+    const handleNotificationRemoved = (data) => {
+      setNewOrderAlert((prev) => {
+        if (!prev) return null;
+        if (!data) return null;
+        if (data.orderId && prev.id === data.orderId) return null;
+        if (data.pickupCode && (prev.pickupCode === data.pickupCode || prev.code === data.pickupCode)) return null;
+        return prev;
+      });
+    };
+
     socket.on('ORDER_CREATED', handleOrderCreated);
     socket.on('NEW_LISTING', handleNewListing);
     socket.on('LISTING_UPDATED', handleListingUpdated);
+    socket.on('PICKUP_VERIFIED', handlePickupVerified);
+    socket.on('NOTIFICATION_REMOVED', handleNotificationRemoved);
 
     return () => {
       socket.off('ORDER_CREATED', handleOrderCreated);
       socket.off('NEW_LISTING', handleNewListing);
       socket.off('LISTING_UPDATED', handleListingUpdated);
+      socket.off('PICKUP_VERIFIED', handlePickupVerified);
+      socket.off('NOTIFICATION_REMOVED', handleNotificationRemoved);
     };
   }, []);
 

@@ -273,12 +273,40 @@ export default function App() {
       );
     };
 
+    const handlePickupVerified = (data) => {
+      if (data) {
+        setActiveAlert((prev) => {
+          if (!prev) return null;
+          const lid = prev.listing?.id || prev.listingId || prev.id;
+          if (data.listingId && lid === data.listingId) return null;
+          if (data.orderId && prev.orderId === data.orderId) return null;
+          return prev;
+        });
+      }
+    };
+
+    const handleNotificationRemoved = (data) => {
+      if (data?.listingId || data?.orderId) {
+        setNotifications((prev) =>
+          prev.filter((n) => {
+            if (data.orderId && n.orderId === data.orderId) return false;
+            if (data.listingId && (n.listingId === data.listingId || n.listing?.id === data.listingId)) {
+              if (n.type === 'ORDER_CONFIRMED') return false;
+            }
+            return true;
+          })
+        );
+      }
+    };
+
     // Subscribes across Socket.io, BroadcastChannel, and storage events
     const unsubscribeNewDrops = onNewListingDrop(handleNewListing);
     socket.on('NOTIFICATION_RECEIVED', handleNotificationReceived);
     socket.on('NEW_NOTIFICATION', handleNotificationReceived);
     socket.on('NEW_LISTING_DROPPED', handleNewListing);
     socket.on('LISTING_UPDATED', handleListingUpdated);
+    socket.on('PICKUP_VERIFIED', handlePickupVerified);
+    socket.on('NOTIFICATION_REMOVED', handleNotificationRemoved);
 
     return () => {
       unsubscribeNewDrops();
@@ -286,6 +314,8 @@ export default function App() {
       socket.off('NEW_NOTIFICATION', handleNotificationReceived);
       socket.off('NEW_LISTING_DROPPED', handleNewListing);
       socket.off('LISTING_UPDATED', handleListingUpdated);
+      socket.off('PICKUP_VERIFIED', handlePickupVerified);
+      socket.off('NOTIFICATION_REMOVED', handleNotificationRemoved);
     };
   }, []);
 
